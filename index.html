@@ -1942,7 +1942,7 @@
             }
         }
         
-        // 2. Akordiyon Açma/Kapatma Fonksiyonu
+        // 2. Akordiyon Açma/Kapatma
         function toggleReviewAccordion(contentId, iconId) {
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
@@ -2108,23 +2108,87 @@
             container.innerHTML = html;
         }
         
-        // 5. Tarih Etiketinden Hafta Bilgisi Hesaplayıcı Helper
-        function getWeekRangeInfo(dateStr) {
-            if (!dateStr || dateStr === 'Tarihsiz') return { weekKey: 'Tarihsiz', weekTitle: 'Tarihsiz Kayıtlar' };
-            
-            let d;
-            if (dateStr.includes('.')) {
-                const parts = dateStr.split('.');
-                if (parts.length === 3) d = new Date(parts[2], parts[1] - 1, parts[0]);
-            } else if (dateStr.includes('-')) {
-                const parts = dateStr.split('-');
-                if (parts.length === 3) d = new Date(parts[0], parts[1] - 1, parts[2]);
-            }
-            if (!d || isNaN(d.getTime())) d = new Date(dateStr);
-            if (isNaN(d.getTime())) return { weekKey: 'Tarihsiz', weekTitle: 'Tarihsiz Kayıtlar' };
+        // 5. Gelişmiş Tarih Ayrıştırıcı (Her Türlü Veri Tipi İçin)
+        function parseLogDate(rawDate) {
+            if (!rawDate) return { dateStr: 'Tarihsiz', dateObj: null };
         
+            // Firebase Timestamp Objesi
+            if (typeof rawDate === 'object' && rawDate.seconds !== undefined) {
+                const d = new Date(rawDate.seconds * 1000);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return { dateStr: `${day}.${month}.${year}`, dateObj: d };
+            }
+        
+            // JS Date Objesi
+            if (rawDate instanceof Date) {
+                if (isNaN(rawDate.getTime())) return { dateStr: 'Tarihsiz', dateObj: null };
+                const day = String(rawDate.getDate()).padStart(2, '0');
+                const month = String(rawDate.getMonth() + 1).padStart(2, '0');
+                const year = rawDate.getFullYear();
+                return { dateStr: `${day}.${month}.${year}`, dateObj: rawDate };
+            }
+        
+            // String Metin
+            if (typeof rawDate === 'string') {
+                const str = rawDate.trim();
+                if (!str) return { dateStr: 'Tarihsiz', dateObj: null };
+        
+                // ISO format YYYY-MM-DD
+                if (str.includes('-')) {
+                    const parts = str.split('T')[0].split('-');
+                    if (parts.length === 3) {
+                        const y = parseInt(parts[0]);
+                        const m = parseInt(parts[1]) - 1;
+                        const d = parseInt(parts[2]);
+                        const dt = new Date(y, m, d);
+                        const dayStr = String(d).padStart(2, '0');
+                        const monthStr = String(m + 1).padStart(2, '0');
+                        return { dateStr: `${dayStr}.${monthStr}.${y}`, dateObj: dt };
+                    }
+                }
+        
+                // TR format DD.MM.YYYY
+                if (str.includes('.')) {
+                    const parts = str.split('.');
+                    if (parts.length === 3) {
+                        const d = parseInt(parts[0]);
+                        const m = parseInt(parts[1]) - 1;
+                        const y = parseInt(parts[2]);
+                        const dt = new Date(y, m, d);
+                        const dayStr = String(d).padStart(2, '0');
+                        const monthStr = String(m + 1).padStart(2, '0');
+                        return { dateStr: `${dayStr}.${monthStr}.${y}`, dateObj: dt };
+                    }
+                }
+        
+                const dt = new Date(str);
+                if (!isNaN(dt.getTime())) {
+                    const dayStr = String(dt.getDate()).padStart(2, '0');
+                    const monthStr = String(dt.getMonth() + 1).padStart(2, '0');
+                    return { dateStr: `${dayStr}.${monthStr}.${dt.getFullYear()}`, dateObj: dt };
+                }
+        
+                return { dateStr: str, dateObj: null };
+            }
+        
+            return { dateStr: 'Tarihsiz', dateObj: null };
+        }
+        
+        // 6. Hafta Bilgisi Başlığı (Pazartesi - Pazar)
+        function getWeekRangeInfo(dateObj, fallbackStr) {
+            if (!dateObj || isNaN(dateObj.getTime())) {
+                return {
+                    weekKey: fallbackStr || 'Tarihsiz',
+                    weekTitle: (fallbackStr && fallbackStr !== 'Tarihsiz') ? fallbackStr : 'Tarihsiz Kayıtlar'
+                };
+            }
+        
+            const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
             const day = d.getDay();
             const diffToMonday = (day === 0 ? -6 : 1 - day);
+            
             const monday = new Date(d);
             monday.setDate(d.getDate() + diffToMonday);
             
@@ -2139,7 +2203,15 @@
             return { weekKey, weekTitle };
         }
         
-        // 6. Günlük Çalışma Akordiyon Oluşturucu (Haftalık > Günlük > Ders)
+        // 7. Gün Başlığı Metni (Örn: 16 Ağustos 2026, Pazar)
+        function getFormattedDayTitle(dateObj, fallbackStr) {
+            if (!dateObj || isNaN(dateObj.getTime())) return fallbackStr || 'Tarihsiz Gün';
+            const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+            const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+            return `${dateObj.getDate()} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}, ${dayNames[dateObj.getDay()]}`;
+        }
+        
+        // 8. Günlük Çalışma Akordiyon Oluşturucu (Haftalık > Günlük > Ders)
         function renderReviewLogsAccordion(logsList) {
             const container = document.getElementById('review-logs-accordion-container');
             if (!container) return;
@@ -2149,12 +2221,26 @@
                 return;
             }
         
-            // A. Verileri Hafta ve Günlere Göre Gruplama
+            // A. Tarihe Göre Yeniden Eskiye Sırala
+            logsList.sort((a, b) => {
+                const rawA = a.date || a.tarih || a.createdAt || a.timestamp || a.time;
+                const rawB = b.date || b.tarih || b.createdAt || b.timestamp || b.time;
+                const da = parseLogDate(rawA).dateObj;
+                const db = parseLogDate(rawB).dateObj;
+                if (da && db) return db - da;
+                if (da) return -1;
+                if (db) return 1;
+                return 0;
+            });
+        
+            // B. Verileri Hafta ve Günlere Göre Gruplama
             const weeksGroup = {};
         
             logsList.forEach(log => {
-                const dateStr = log.date || log.tarih || 'Tarihsiz';
-                const { weekKey, weekTitle } = getWeekRangeInfo(dateStr);
+                const rawDate = log.date || log.tarih || log.createdAt || log.timestamp || log.time;
+                const { dateStr, dateObj } = parseLogDate(rawDate);
+                const { weekKey, weekTitle } = getWeekRangeInfo(dateObj, dateStr);
+                const dayTitle = getFormattedDayTitle(dateObj, dateStr);
         
                 if (!weeksGroup[weekKey]) {
                     weeksGroup[weekKey] = {
@@ -2164,16 +2250,19 @@
                 }
         
                 if (!weeksGroup[weekKey].days[dateStr]) {
-                    weeksGroup[weekKey].days[dateStr] = [];
+                    weeksGroup[weekKey].days[dateStr] = {
+                        title: dayTitle,
+                        logs: []
+                    };
                 }
         
-                weeksGroup[weekKey].days[dateStr].push(log);
+                weeksGroup[weekKey].days[dateStr].logs.push(log);
             });
         
             let html = '';
             let weekIdx = 0;
         
-            // B. HAFTALIK AKORDİYON (1. KADEME)
+            // C. HAFTALIK AKORDİYON (1. KADEME)
             for (const [weekKey, weekData] of Object.entries(weeksGroup)) {
                 weekIdx++;
                 const weekId = `rev-log-week-${weekIdx}`;
@@ -2182,32 +2271,35 @@
                 let daysHtml = '';
                 let dayIdx = 0;
         
-                // C. GÜNLÜK AKORDİYON (2. KADEME)
-                for (const [dateStr, dayLogs] of Object.entries(weekData.days)) {
+                // D. GÜNLÜK AKORDİYON (2. KADEME)
+                for (const [dateStr, dayData] of Object.entries(weekData.days)) {
                     dayIdx++;
                     const dayId = `${weekId}-day-${dayIdx}`;
         
-                    const dayTotalQuestions = dayLogs.reduce((sum, item) => {
-                        return sum + Number(item.questionCount || item.questionsSolved || item.count || item.questions || 0);
+                    const dayTotalQuestions = dayData.logs.reduce((sum, item) => {
+                        const q = Number(item.questionCount || item.questionsSolved || item.soruSayisi || item.count || item.questions || item.soru || 0);
+                        return sum + q;
                     }, 0);
         
                     weekTotalQuestions += dayTotalQuestions;
         
-                    // D. DERS / OTURUM DETAYLARI (3. KADEME)
+                    // E. DERS / OTURUM DETAYLARI (3. KADEME)
                     let sessionsHtml = '';
-                    dayLogs.forEach(log => {
-                        const subj = log.subject || log.ders || log.title || 'Ders';
-                        const topic = log.topic || log.konu || '';
-                        const qCount = Number(log.questionCount || log.questionsSolved || log.count || log.questions || 0);
-                        const correct = log.correct !== undefined ? Number(log.correct) : null;
-                        const wrong = log.wrong !== undefined ? Number(log.wrong) : null;
-                        const note = log.note || log.not || '';
+                    dayData.logs.forEach(log => {
+                        const subj = log.subject || log.ders || log.title || log.subjectName || log.dersAdi || 'Ders';
+                        const topic = log.topic || log.konu || log.topicName || log.konuAdi || '';
+                        const qCount = Number(log.questionCount || log.questionsSolved || log.soruSayisi || log.count || log.questions || log.soru || 0);
+                        
+                        const correctVal = log.correct !== undefined && log.correct !== null ? log.correct : (log.dogru !== undefined ? log.dogru : null);
+                        const wrongVal = log.wrong !== undefined && log.wrong !== null ? log.wrong : (log.yanlis !== undefined ? log.yanlis : null);
+                        
+                        const note = log.note || log.not || log.aciklama || log.description || '';
         
                         let statsBadge = '';
-                        if (correct !== null && wrong !== null) {
+                        if (correctVal !== null && wrongVal !== null) {
                             statsBadge = `
                                 <span class="text-[10px] text-gray-400 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded font-mono ml-2">
-                                    <span class="text-green-400 font-bold">${correct}D</span> / <span class="text-red-400 font-bold">${wrong}Y</span>
+                                    <span class="text-green-400 font-bold">${correctVal}D</span> / <span class="text-red-400 font-bold">${wrongVal}Y</span>
                                 </span>
                             `;
                         }
@@ -2232,7 +2324,7 @@
                             <button onclick="toggleReviewAccordion('${dayId}', '${dayId}-icon')" class="w-full p-2.5 flex justify-between items-center text-left hover:bg-gray-800/60 transition">
                                 <div class="flex items-center gap-2">
                                     <i class="fa-regular fa-calendar-check text-green-400 text-xs"></i>
-                                    <span class="font-bold text-gray-200 text-xs">${dateStr}</span>
+                                    <span class="font-bold text-gray-200 text-xs">${dayData.title}</span>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <span class="text-[11px] font-semibold text-green-400 bg-green-950/40 px-2 py-0.5 rounded border border-green-800/40 font-mono">${dayTotalQuestions} Soru</span>
@@ -2276,7 +2368,7 @@
             container.innerHTML = html;
         }
         
-        // 7. Öğrenci İnceleme Ana Fonksiyonu
+        // 9. Öğrenci İnceleme Ana Fonksiyonu
         async function selectStudentForReview(studentUid, studentEmail, studentName) {
             const detailsContainer = document.getElementById('selected-student-details');
             if (!detailsContainer) return;
@@ -2327,9 +2419,9 @@
                     `;
                 });
         
-                // 2. Günlük Çalışmaları Çek
+                // 2. Günlük Çalışmaları Çek (Tüm İhtimaller)
                 let logsList = [];
-                const logsSnap = await db.collection("users").doc(studentUid).collection("studyLogs").orderBy("date", "desc").get().catch(() => null);
+                const logsSnap = await db.collection("users").doc(studentUid).collection("studyLogs").get().catch(() => null);
                 if (logsSnap && !logsSnap.empty) {
                     logsSnap.forEach(d => logsList.push(d.data()));
                 } else if (userData.studyLogs && Array.isArray(userData.studyLogs)) {
@@ -2381,7 +2473,6 @@
                     </div>
                 `;
         
-                // Render İşlemlerini Tetikle
                 renderReviewBooksAccordion(booksList);
                 renderReviewLogsAccordion(logsList);
         
