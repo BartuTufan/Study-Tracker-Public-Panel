@@ -487,12 +487,7 @@
                 console.error("Firebase veri yükleme hatası:", err);
             }
         }
-        // Giriş yapan kullanıcının verisi Firestore'a kaydedilirken:
-        await setDoc(doc(db, "users", user.uid), {
-            displayName: user.displayName,
-            email: user.email,
-            role: "student" // Eğer role alanı yoksa varsayılan olarak "student" atar
-        }, { merge: true }); // merge: true sayesinde mevcut verileriniz silinmez
+        
         
         // Giriş yapıldığında veya kullanıcı verisi çekilirken:
         async function handleUserData(user) {
