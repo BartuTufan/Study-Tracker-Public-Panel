@@ -1576,179 +1576,124 @@
             document.getElementById('logDate').value = getTodayStr();
         };
 
-        // ================= GÜNCELLENMİŞ ÖĞRETMEN PANELİ MANTIĞI =================
-        let selectedStudentId = null;
-        let currentTeacherTab = 'books';
+        // ================= GÜNCEL ÖĞRETMEN PANELİ JAVASCRIPT KODLARI =================
         
-        // Kullanıcı oturum açtığında veya yetki değiştiğinde çalışacak ana kontrol
+        // Kullanıcı rolünü kontrol edip öğretmen panelini başlatan ana fonksiyon
         async function checkUserRoleAndInitPanel() {
             if (!currentUser) return;
-        
             try {
-                const userRef = db.collection("users").doc(currentUser.uid);
-                const userDoc = await userRef.get();
-        
-                const teacherPanelEl = document.getElementById('teacher-panel');
-                const studentMainEl = document.getElementById('student-main-content'); // Varsa ana öğrenci içeriği ID'niz
-        
-                if (userDoc.exists && (userDoc.data().role === 'teacher' || userDoc.data().role === 'admin')) {
-                    // Eğer kullanıcı öğretmense öğretmen panelini göster, öğrenci alanlarını gizle
-                    if (teacherPanelEl) teacherPanelEl.classList.remove('hidden');
-                    if (studentMainEl) studentMainEl.classList.add('hidden');
+                const userDoc = await db.collection("users").doc(currentUser.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    const role = userData.role || 'student';
                     
-                    document.getElementById('teacher-email-display').innerText = `Yetkili: ${currentUser.email}`;
-                    await loadStudentsListForTeacher();
-                } else {
-                    // Öğrenci ise tam tersi
-                    if (teacherPanelEl) teacherPanelEl.classList.add('hidden');
-                    if (studentMainEl) studentMainEl.classList.remove('hidden');
+                    const teacherPanel = document.getElementById('teacher-panel');
+                    const studentPanel = document.getElementById('student-panel'); // veya ana öğrenci arayüzü
+
+                    if (role === 'teacher' || role === 'admin') {
+                        if (teacherPanel) teacherPanel.classList.remove('hidden');
+                        if (studentPanel) studentPanel.classList.add('hidden');
+                        document.getElementById('teacher-email-display').innerText = currentUser.email;
+                        await loadStudentListForTeacher();
+                    } else {
+                        if (teacherPanel) teacherPanel.classList.add('hidden');
+                        if (studentPanel) studentPanel.classList.remove('hidden');
+                    }
                 }
             } catch (e) {
-                console.error("Rol kontrolü başarısız:", e);
+                console.error("Rol kontrolü sırasında hata oluştu:", e);
             }
         }
-        
-        // 1. Sistemdeki öğrencileri Firestore'dan çekip listeleme
-        async function loadStudentsListForTeacher() {
-            const container = document.getElementById('students-list-container');
-            const countBadge = document.getElementById('student-count-badge');
-            if (!container) return;
-            
-            container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Öğrenciler yükleniyor...</p>';
-        
+
+        // Öğretmenin görebileceği öğrenci listesini çeken fonksiyon
+        async function loadStudentListForTeacher() {
+            const selectElement = document.getElementById('teacher-student-select');
+            if (!selectElement) return;
+
             try {
+                selectElement.innerHTML = '<option value="">Öğrenciler yükleniyor...</option>';
                 const snapshot = await db.collection("users").where("role", "==", "student").get();
-                if (countBadge) countBadge.innerText = `${snapshot.size} Kayıt`;
-        
+                
                 if (snapshot.empty) {
-                    container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Kayıtlı öğrenci bulunamadı.</p>';
+                    selectElement.innerHTML = '<option value="">Sistemde kayıtlı öğrenci bulunamadı.</option>';
                     return;
                 }
-        
-                let html = '';
+
+                let optionsHtml = '<option value="">Bir öğrenci seçin...</option>';
                 snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const studentId = doc.id;
-                    const isSelected = selectedStudentId === studentId ? 'bg-indigo-600/25 border-indigo-500' : 'bg-gray-900 border-gray-800 hover:border-gray-700';
-                    
-                    html += `
-                        <div onclick="selectStudent('${studentId}', '${data.displayName || data.email}')" class="p-3 border rounded-xl cursor-pointer transition flex items-center justify-between ${isSelected}">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
-                                    ${(data.displayName || data.email || 'Ö')[0].toUpperCase()}
-                                </div>
-                                <div>
-                                    <p class="font-bold text-sm text-white">${data.displayName || 'İsimsiz Öğrenci'}</p>
-                                    <p class="text-[11px] text-gray-400 truncate max-w-[150px]">${data.email || ''}</p>
-                                </div>
-                            </div>
-                            <i class="fa-solid fa-chevron-right text-xs text-gray-500"></i>
-                        </div>
-                    `;
+                    const student = doc.data();
+                    optionsHtml += `<option value="${doc.id}">${student.email || doc.id}</option>`;
                 });
-                container.innerHTML = html;
+                selectElement.innerHTML = optionsHtml;
             } catch (e) {
-                console.error(e);
-                container.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Öğrenciler yüklenirken hata oluştu.</p>';
+                console.error("Öğrenci listesi alınamadı:", e);
+                selectElement.innerHTML = '<option value="">Öğrenciler yüklenirken hata oluştu.</option>';
             }
         }
-        
-        // 2. Öğrenci kartına tıklandığında tetiklenen fonksiyon
-        async function selectStudent(studentId, studentName) {
-            selectedStudentId = studentId;
-            await loadStudentsListForTeacher(); // Listeyi güncelleyip seçileni vurgula
-        
-            const header = document.getElementById('selected-student-header');
-            if (header) {
-                header.innerHTML = `
-                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span> ${studentName}
-                    </h2>
-                    <p class="text-xs text-gray-400">Seçilen öğrencinin çalışma verileri aşağıda listelenmektedir.</p>
-                `;
-            }
-        
-            await loadSelectedStudentData();
-        }
-        
-        // Sekme değişimi (Kitaplar / Loglar)
-        function switchTeacherTab(tab) {
-            currentTeacherTab = tab;
-            const btnBooks = document.getElementById('tab-btn-books');
-            const btnLogs = document.getElementById('tab-btn-logs');
-        
-            if (tab === 'books') {
-                if (btnBooks) btnBooks.className = "px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white transition";
-                if (btnLogs) btnLogs.className = "px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition";
-            } else {
-                if (btnLogs) btnLogs.className = "px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white transition";
-                if (btnBooks) btnBooks.className = "px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition";
-            }
-            loadSelectedStudentData();
-        }
-        
-        // 3. Seçilen öğrencinin alt koleksiyonlarındaki (books / logs) verileri getirme
-        async function loadSelectedStudentData() {
-            if (!selectedStudentId) return;
-            const container = document.getElementById('teacher-student-content');
-            if (!container) return;
-            
-            container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Veriler yükleniyor...</p>';
-        
-            if (currentTeacherTab === 'books') {
-                try {
-                    const booksSnap = await db.collection("users").doc(selectedStudentId).collection("books").get();
+
+        // Seçilen öğrencinin verilerini (kitap ilerlemeleri ve günlük logları) getiren fonksiyon
+        async function loadStudentDataForTeacher(studentId) {
+            if (!studentId) return;
+
+            const booksContainer = document.getElementById('teacher-student-books');
+            const logsContainer = document.getElementById('teacher-student-logs');
+
+            if (booksContainer) booksContainer.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Kitap ilerlemeleri yükleniyor...</p>';
+            if (logsContainer) logsContainer.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Çalışma logları yükleniyor...</p>';
+
+            try {
+                // Öğrencinin Kitap İlerlemelerini Çek
+                const booksSnap = await db.collection("users").doc(studentId).collection("books").get();
+                if (booksContainer) {
                     if (booksSnap.empty) {
-                        container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Öğrenciye ait kitap bulunamadı.</p>';
-                        return;
+                        booksContainer.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Öğrenciye ait kitap ilerlemesi bulunamadı.</p>';
+                    } else {
+                        let booksHtml = '<div class="space-y-3">';
+                        booksSnap.forEach(doc => {
+                            const book = doc.data();
+                            booksHtml += `
+                                <div class="p-3 bg-gray-900 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
+                                    <div>
+                                        <p class="font-bold text-white">${book.name || 'İsimsiz Kitap'}</p>
+                                        <p class="text-xs text-gray-400">Çözülen: ${book.solved || 0} / Toplam: ${book.total || 0}</p>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        booksHtml += '</div>';
+                        booksContainer.innerHTML = booksHtml;
                     }
-                    let html = '<div class="space-y-3">';
-                    booksSnap.forEach(doc => {
-                        const book = doc.data();
-                        html += `
-                            <div class="p-3 bg-gray-900 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
-                                <div>
-                                    <p class="font-bold text-white">${book.name || 'İsimsiz Kitap'}</p>
-                                    <p class="text-xs text-gray-400">Ders: ${book.subject || '-'}</p>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-indigo-400 font-bold">${book.completedTests || 0} / ${book.totalTests || 0} Test</span>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    html += '</div>';
-                    container.innerHTML = html;
-                } catch (e) {
-                    container.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Kitap verileri okunamadı.</p>';
                 }
-            } else {
-                try {
-                    const logsSnap = await db.collection("users").doc(selectedStudentId).collection("logs").orderBy("date", "desc").get();
+
+                // Öğrencinin Günlük Çalışma Loglarını Çek
+                const logsSnap = await db.collection("users").doc(studentId).collection("logs").orderBy("date", "desc").limit(10).get();
+                if (logsContainer) {
                     if (logsSnap.empty) {
-                        container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Öğrenciye ait çalışma günlüğü bulunamadı.</p>';
-                        return;
+                        logsContainer.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Öğrenciye ait çalışma günlüğü bulunamadı.</p>';
+                    } else {
+                        let logsHtml = '<div class="space-y-3">';
+                        logsSnap.forEach(doc => {
+                            const log = doc.data();
+                            logsHtml += `
+                                <div class="p-3 bg-gray-900 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
+                                    <div>
+                                        <p class="font-bold text-white">${log.subject || ''} - ${log.topic || ''}</p>
+                                        <p class="text-xs text-gray-400">${log.date || ''}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-green-400 font-bold">${log.questionCount || 0} Soru</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        logsHtml += '</div>';
+                        logsContainer.innerHTML = logsHtml;
                     }
-                    let html = '<div class="space-y-3">';
-                    logsSnap.forEach(doc => {
-                        const log = doc.data();
-                        html += `
-                            <div class="p-3 bg-gray-900 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
-                                <div>
-                                    <p class="font-bold text-white">${log.subject || ''} - ${log.topic || ''}</p>
-                                    <p class="text-xs text-gray-400">${log.date || ''}</p>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-green-400 font-bold">${log.questionCount || 0} Soru</span>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    html += '</div>';
-                    container.innerHTML = html;
-                } catch (e) {
-                    container.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Çalışma logları okunamadı.</p>';
                 }
+            } catch (e) {
+                console.error("Öğrenci verileri okunurken hata:", e);
+                if (booksContainer) booksContainer.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Kitap verileri okunamadı.</p>';
+                if (logsContainer) logsContainer.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Çalışma logları okunamadı.</p>';
             }
         }
         // ================= BİTİŞ =================
