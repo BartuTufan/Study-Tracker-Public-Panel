@@ -1917,11 +1917,13 @@
             }
         }
 
-        // Seçilen Öğrencinin Verilerini Gizliliği Sağlayarak Güvenli Çekme
-        async function selectStudentForInspection(studentUid, studentEmail, studentName) {
+        // Öğretmen listeden "İncele" butonuna bastığında çalışacak ana fonksiyon
+        async function selectStudentForReview(studentUid, studentEmail, studentName) {
             const detailsContainer = document.getElementById('selected-student-details');
             
-            // Yükleniyor mesajı gösterelim
+            if (!detailsContainer) return;
+        
+            // Yükleniyor animasyonu gösterelim
             detailsContainer.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-full text-center py-12">
                     <div class="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mb-3"></div>
@@ -1936,18 +1938,20 @@
                 // 2. Öğrencinin Günlük Çalışma Loglarını Çek (`users/{uid}/studyLogs`)
                 const logsSnap = await db.collection("users").doc(studentUid).collection("studyLogs").orderBy("date", "desc").get();
                 
-                // Arayüzü oluşturmaya başlıyoruz
+                // Sağ panelin içeriğini sekmeli / düzenli bir yapıyla oluşturalım
                 let html = `
                     <div class="flex flex-col h-full space-y-4">
-                        <div class="border-b border-gray-800 pb-3">
-                            <h2 class="text-base font-bold text-white">${studentName || 'İsimsiz Öğrenci'}</h2>
-                            <p class="text-xs text-gray-400">${studentEmail || ''}</p>
+                        <div class="border-b border-gray-800 pb-3 flex justify-between items-center">
+                            <div>
+                                <h2 class="text-base font-bold text-white">${studentName || 'İsimsiz Öğrenci'}</h2>
+                                <p class="text-xs text-gray-400">${studentEmail || ''}</p>
+                            </div>
                         </div>
         
                         <div class="flex-1 overflow-y-auto space-y-4 pr-1">
                             
                             <div>
-                                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Kitaplık İlerlemesi</h3>
+                                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">📚 Öğrencinin Kitaplığı ve İlerlemesi</h3>
                 `;
         
                 if (booksSnap.empty) {
@@ -1983,8 +1987,8 @@
                 html += `
                             </div>
         
-                            <div class="pt-2 border-t border-gray-800">
-                                <h3 class="text-xs font-bold text-green-400 uppercase tracking-wider mb-2">Çalışma Günlüğü (Son Aktiviteler)</h3>
+                            <div class="pt-3 border-t border-gray-800">
+                                <h3 class="text-xs font-bold text-green-400 uppercase tracking-wider mb-2">📝 Günlük Çalışma Geçmişi</h3>
                 `;
         
                 if (logsSnap.empty) {
@@ -2018,21 +2022,6 @@
                 console.error("Öğrenci verileri okunamadı:", e);
                 detailsContainer.innerHTML = '<p class="text-red-400 text-sm text-center py-12">Bu öğrencinin verilerine erişim izniniz yok veya bir hata oluştu.</p>';
             }
-        }
-        // =========================================================================
-        function switchStudentTab(tabName) {
-            // Tüm alt sekmeleri gizle, butonların renklerini sıfırla
-            document.querySelectorAll('.student-subtab').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('[id^="st-tab-"]').forEach(btn => {
-                btn.classList.remove('bg-indigo-600', 'text-white');
-                btn.classList.add('text-gray-400');
-            });
-        
-            // Seçilen sekmeyi ve butonu aktif yap
-            document.getElementById(`student-tab-${tabName}`).classList.remove('hidden');
-            const activeBtn = document.getElementById(`st-tab-${tabName}`);
-            activeBtn.classList.remove('text-gray-400');
-            activeBtn.classList.add('bg-indigo-600', 'text-white');
         }
     </script>
 </body>
