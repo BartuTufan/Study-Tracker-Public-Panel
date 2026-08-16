@@ -430,6 +430,12 @@
                 document.getElementById('user-avatar').src = user.photoURL || '';
                 document.getElementById('sync-status').innerText = `Bulut Senkronize: ${user.displayName || user.email}`;
                 
+                await db.collection("users").doc(user.uid).set({
+                    displayName: user.displayName || '',
+                    email: user.email || '',
+                    role: "student" // Varsayılan rol
+                }, { merge: true });
+                
                 // Başka hesaptan kalan veriyi temizle ve Google hesabının verisini yükle
                 state = createDefaultState();
                 await loadUserDataFromFirebase();
