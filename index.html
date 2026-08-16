@@ -116,12 +116,53 @@
                         </div>
                     </div>
                     
-                    <div id="selected-student-details" class="md:col-span-2 bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl flex flex-col h-[500px] overflow-y-auto">
-                        <div class="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div id="selected-student-details" class="md:col-span-2 bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl flex flex-col h-[500px] overflow-hidden">
+                        <div class="flex flex-col items-center justify-center h-full text-center py-12" id="student-details-placeholder">
                             <div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 mb-3">
                                 <i class="fa-solid fa-arrow-pointer text-lg"></i>
                             </div>
                             <p class="text-gray-400 text-sm font-medium">İncelemek için soldaki listeden bir öğrenci seçin.</p>
+                        </div>
+                        
+                        <div id="student-details-content" class="hidden flex flex-col h-full">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-800 pb-3 mb-4 gap-2">
+                                <div>
+                                    <h2 id="modal-student-name" class="text-base font-bold text-white">Öğrenci Adı</h2>
+                                    <p id="modal-student-email" class="text-xs text-gray-400">ogrenci@email.com</p>
+                                </div>
+                                <div class="flex gap-1 bg-gray-950 p-1 rounded-xl border border-gray-800">
+                                    <button onclick="switchStudentTab('overview')" id="st-tab-overview" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition">Genel</button>
+                                    <button onclick="switchStudentTab('books')" id="st-tab-books" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition">Kitaplık</button>
+                                    <button onclick="switchStudentTab('logs')" id="st-tab-logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition">Günlük</button>
+                                </div>
+                            </div>
+                    
+                            <div class="flex-1 overflow-y-auto pr-1 space-y-4">
+                                <div id="student-tab-overview" class="student-subtab space-y-4">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div class="bg-gray-800/40 p-3 rounded-xl border border-gray-800">
+                                            <p class="text-[11px] text-gray-400">Toplam Çözülen Soru</p>
+                                            <p id="st-total-questions" class="text-lg font-bold text-indigo-400">0</p>
+                                        </div>
+                                        <div class="bg-gray-800/40 p-3 rounded-xl border border-gray-800">
+                                            <p class="text-[11px] text-gray-400">Kayıtlı Kitap Sayısı</p>
+                                            <p id="st-total-books" class="text-lg font-bold text-green-400">0</p>
+                                        </div>
+                                    </div>
+                                </div>
+                    
+                                <div id="student-tab-books" class="student-subtab hidden space-y-3">
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Öğrencinin Kitapları ve İlerlemesi</h4>
+                                    <div id="st-books-list" class="space-y-3">
+                                        </div>
+                                </div>
+                    
+                                <div id="student-tab-logs" class="student-subtab hidden space-y-3">
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Öğrencinin Çalışma Günlüğü</h4>
+                                    <div id="st-logs-list" class="space-y-2">
+                                        </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1877,37 +1918,82 @@
         }
 
         // Seçilen Öğrencinin Verilerini Gizliliği Sağlayarak Güvenli Çekme
-        async function selectStudentForReview(studentUid, studentName) {
+        async function selectStudentForInspection(studentUid, studentEmail, studentName) {
             const detailsContainer = document.getElementById('selected-student-details');
+            
+            // Yükleniyor mesajı gösterelim
             detailsContainer.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full py-12">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mb-2"></div>
-                    <p class="text-gray-400 text-sm">${studentName} verileri yükleniyor...</p>
+                <div class="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div class="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mb-3"></div>
+                    <p class="text-gray-400 text-sm font-medium">Öğrenci verileri yükleniyor...</p>
                 </div>
             `;
-
+        
             try {
-                // Öğrencinin çalışma günlüklerini (dailyLogs) çekiyoruz
-                const logsSnap = await db.collection("users").doc(studentUid).collection("dailyLogs").get();
+                // 1. Öğrencinin Kitaplık Verilerini Çek (`users/{uid}/books`)
+                const booksSnap = await db.collection("users").doc(studentUid).collection("books").get();
                 
+                // 2. Öğrencinin Günlük Çalışma Loglarını Çek (`users/{uid}/studyLogs`)
+                const logsSnap = await db.collection("users").doc(studentUid).collection("studyLogs").orderBy("date", "desc").get();
+                
+                // Arayüzü oluşturmaya başlıyoruz
                 let html = `
-                    <div class="space-y-4">
-                        <div class="border-b border-gray-800 pb-3 flex justify-between items-center">
-                            <div>
-                                <h3 class="text-base font-bold text-white">${studentName} - Çalışma Raporu</h3>
-                                <p class="text-xs text-gray-400">Hesap gizliliği korumalı öğrenci görünümü</p>
-                            </div>
+                    <div class="flex flex-col h-full space-y-4">
+                        <div class="border-b border-gray-800 pb-3">
+                            <h2 class="text-base font-bold text-white">${studentName || 'İsimsiz Öğrenci'}</h2>
+                            <p class="text-xs text-gray-400">${studentEmail || ''}</p>
                         </div>
-                        <div class="space-y-2.5">
+        
+                        <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+                            
+                            <div>
+                                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Kitaplık İlerlemesi</h3>
                 `;
-
+        
+                if (booksSnap.empty) {
+                    html += `<p class="text-gray-500 text-xs py-2">Bu öğrenciye ait kayıtlı kitap bulunmuyor.</p>`;
+                } else {
+                    booksSnap.forEach(doc => {
+                        const book = doc.data();
+                        let bookCompleted = 0;
+                        let bookTotal = 0;
+        
+                        if (book.topics && Array.isArray(book.topics)) {
+                            book.topics.forEach(topic => {
+                                bookCompleted += Number(topic.completedTests || 0);
+                                bookTotal += Number(topic.totalTests || 0);
+                            });
+                        }
+                        const percent = bookTotal > 0 ? Math.round((bookCompleted / bookTotal) * 100) : 0;
+        
+                        html += `
+                            <div class="p-3 bg-gray-800/40 border border-gray-800 rounded-xl space-y-2 mb-2">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="font-bold text-white">${book.name || 'İsimsiz Kitap'}</span>
+                                    <span class="text-indigo-400 font-semibold">%${percent}</span>
+                                </div>
+                                <div class="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                                    <div class="bg-indigo-500 h-full rounded-full" style="width: ${percent}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+        
+                html += `
+                            </div>
+        
+                            <div class="pt-2 border-t border-gray-800">
+                                <h3 class="text-xs font-bold text-green-400 uppercase tracking-wider mb-2">Çalışma Günlüğü (Son Aktiviteler)</h3>
+                `;
+        
                 if (logsSnap.empty) {
-                    html += '<p class="text-gray-500 text-xs text-center py-12">Bu öğrenciye ait kayıtlı çalışma günlüğü bulunmuyor.</p>';
+                    html += `<p class="text-gray-500 text-xs py-2">Bu öğrenciye ait kayıtlı çalışma günlüğü bulunmuyor.</p>`;
                 } else {
                     logsSnap.forEach(doc => {
                         const log = doc.data();
                         html += `
-                            <div class="p-3 bg-gray-800/30 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
+                            <div class="p-3 bg-gray-800/30 border border-gray-800 rounded-xl flex justify-between items-center text-sm mb-2">
                                 <div>
                                     <p class="font-bold text-white text-xs sm:text-sm">${log.subject || 'Ders'} - ${log.topic || 'Konu'}</p>
                                     <p class="text-[11px] text-gray-400">${log.date || ''}</p>
@@ -1919,16 +2005,35 @@
                         `;
                     });
                 }
-
-                html += `</div></div>`;
+        
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+        
                 detailsContainer.innerHTML = html;
-
+        
             } catch (e) {
                 console.error("Öğrenci verileri okunamadı:", e);
                 detailsContainer.innerHTML = '<p class="text-red-400 text-sm text-center py-12">Bu öğrencinin verilerine erişim izniniz yok veya bir hata oluştu.</p>';
             }
         }
         // =========================================================================
+        function switchStudentTab(tabName) {
+            // Tüm alt sekmeleri gizle, butonların renklerini sıfırla
+            document.querySelectorAll('.student-subtab').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('[id^="st-tab-"]').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white');
+                btn.classList.add('text-gray-400');
+            });
+        
+            // Seçilen sekmeyi ve butonu aktif yap
+            document.getElementById(`student-tab-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`st-tab-${tabName}`);
+            activeBtn.classList.remove('text-gray-400');
+            activeBtn.classList.add('bg-indigo-600', 'text-white');
+        }
     </script>
 </body>
 </html>
