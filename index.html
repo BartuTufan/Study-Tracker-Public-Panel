@@ -1917,7 +1917,14 @@
             }
         }
 
-        // 1. Öğrenci Detay Paneli Sekme Değiştirme Fonksiyonu
+        // =========================================================================
+        // ÖĞRETEN İNCELEME PANELİ: DERS FİLTRELEMELİ VE KATMANLI AKORDİYONLU YAPI
+        // =========================================================================
+        
+        // Global Öğrenci Kitap Önbelleği
+        let reviewStudentBooksCache = [];
+        
+        // 1. Sekme Değiştirme (Kitaplık / Günlük)
         function switchReviewTab(tabName) {
             document.querySelectorAll('.review-tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.review-tab-btn').forEach(btn => {
@@ -1939,20 +1946,179 @@
         function toggleReviewAccordion(contentId, iconId) {
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
-            if (content) {
-                content.classList.toggle('hidden');
-            }
-            if (icon) {
-                icon.classList.toggle('rotate-180');
-            }
+            if (content) content.classList.toggle('hidden');
+            if (icon) icon.classList.toggle('rotate-180');
         }
         
-        // 3. Öğrenci İnceleme Ana Fonksiyonu (Kitaplık ve Günlük Akordiyonlu)
+        // 3. Üst Navigasyondan Ders Seçimi ve Filtreleme
+        function filterReviewBooksBySubject(subjectName) {
+            document.querySelectorAll('.review-subject-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white');
+                btn.classList.add('bg-gray-800', 'text-gray-400', 'hover:text-white');
+            });
+        
+            const activeBtn = document.getElementById(`review-subj-btn-${subjectName.replace(/\s+/g, '-')}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-gray-800', 'text-gray-400', 'hover:text-white');
+                activeBtn.classList.add('bg-indigo-600', 'text-white');
+            }
+        
+            const filteredBooks = (subjectName === 'Tümü') 
+                ? reviewStudentBooksCache 
+                : reviewStudentBooksCache.filter(b => (b.subject || b.ders || 'Diğer') === subjectName);
+        
+            renderReviewBooksAccordion(filteredBooks);
+        }
+        
+        // 4. Kitap > Bölüm > Konu Akordiyon Oluşturucu
+        function renderReviewBooksAccordion(booksList) {
+            const container = document.getElementById('review-books-accordion-container');
+            if (!container) return;
+        
+            if (!booksList || booksList.length === 0) {
+                container.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">Seçili derse ait kayıtlı kitap bulunamadı.</p>`;
+                return;
+            }
+        
+            let html = '';
+            let bookIdx = 0;
+        
+            booksList.forEach(book => {
+                bookIdx++;
+                const bookId = `rev-book-${bookIdx}`;
+        
+                // Bölümleri (Chapters/Sections) Düzenle
+                let chaptersMap = [];
+                if (book.chapters && Array.isArray(book.chapters) && book.chapters.length > 0) {
+                    chaptersMap = book.chapters;
+                } else if (book.sections && Array.isArray(book.sections) && book.sections.length > 0) {
+                    chaptersMap = book.sections;
+                } else if (book.topics && Array.isArray(book.topics) && book.topics.length > 0) {
+                    const tempMap = {};
+                    book.topics.forEach(top => {
+                        const secName = top.chapter || top.section || top.bölüm || 'Genel Konular';
+                        if (!tempMap[secName]) tempMap[secName] = [];
+                        tempMap[secName].push(top);
+                    });
+                    for (const [secName, topList] of Object.entries(tempMap)) {
+                        chaptersMap.push({ name: secName, topics: topList });
+                    }
+                }
+        
+                // Genel Kitap İlerlemesi
+                let totalBookComp = 0;
+                let totalBookTot = 0;
+                chaptersMap.forEach(chap => {
+                    if (chap.topics && Array.isArray(chap.topics)) {
+                        chap.topics.forEach(t => {
+                            totalBookComp += Number(t.completedTests || 0);
+                            totalBookTot += Number(t.totalTests || 0);
+                        });
+                    }
+                });
+                const bookPercent = totalBookTot > 0 ? Math.round((totalBookComp / totalBookTot) * 100) : 0;
+        
+                // BÖLÜMLERİ (CHAPTERS) OLUŞTUR
+                let chaptersHtml = '';
+                let chapIdx = 0;
+        
+                if (chaptersMap.length === 0) {
+                    chaptersHtml = `<p class="text-gray-500 text-[11px] py-2 text-center">Bu kitapta henüz bölüm/konu eklenmemiş.</p>`;
+                } else {
+                    chaptersMap.forEach(chap => {
+                        chapIdx++;
+                        const chapId = `${bookId}-chap-${chapIdx}`;
+        
+                        let chapComp = 0;
+                        let chapTot = 0;
+                        let topicsHtml = '';
+        
+                        if (chap.topics && Array.isArray(chap.topics) && chap.topics.length > 0) {
+                            chap.topics.forEach(t => {
+                                const comp = Number(t.completedTests || 0);
+                                const tot = Number(t.totalTests || 0);
+                                chapComp += comp;
+                                chapTot += tot;
+                                const topPercent = tot > 0 ? Math.round((comp / tot) * 100) : 0;
+        
+                                // KONU KARTLARI (3. KADEME)
+                                topicsHtml += `
+                                    <div class="flex justify-between items-center text-xs p-2 bg-gray-950/80 rounded-lg border border-gray-800/80">
+                                        <div class="flex-1 pr-3">
+                                            <span class="font-medium text-gray-300 text-[11px]">${t.name || t.topicName || 'Konu'}</span>
+                                            <div class="w-full bg-gray-800 h-1 rounded-full overflow-hidden mt-1">
+                                                <div class="bg-indigo-400 h-full rounded-full" style="width: ${topPercent}%"></div>
+                                            </div>
+                                        </div>
+                                        <span class="text-gray-400 text-[10px] font-mono">${comp}/${tot} Test (%${topPercent})</span>
+                                    </div>
+                                `;
+                            });
+                        } else {
+                            topicsHtml = `<p class="text-gray-500 text-[10px] py-1 text-center">Bu bölümde konu bulunmuyor.</p>`;
+                        }
+        
+                        const chapPercent = chapTot > 0 ? Math.round((chapComp / chapTot) * 100) : 0;
+        
+                        // BÖLÜM KARTLARI (2. KADEME AKORDİYON)
+                        chaptersHtml += `
+                            <div class="border border-gray-800/80 rounded-lg bg-gray-900/60 overflow-hidden mb-2">
+                                <button onclick="toggleReviewAccordion('${chapId}', '${chapId}-icon')" class="w-full p-2.5 flex justify-between items-center text-left hover:bg-gray-800/60 transition">
+                                    <div class="flex items-center gap-2 flex-1 pr-2">
+                                        <i class="fa-solid fa-folder-open text-indigo-400 text-xs"></i>
+                                        <span class="font-semibold text-gray-200 text-xs">${chap.name || 'Bölüm'}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] text-gray-400 font-mono">%${chapPercent}</span>
+                                        <i id="${chapId}-icon" class="fa-solid fa-chevron-down text-gray-400 text-[10px] transition-transform duration-200"></i>
+                                    </div>
+                                </button>
+                                
+                                <div id="${chapId}" class="hidden p-2 border-t border-gray-800/60 space-y-1.5 bg-gray-950/40">
+                                    ${topicsHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+        
+                // KİTAP KARTLARI (1. KADEME AKORDİYON)
+                const bookSubjectTag = book.subject || book.ders || 'Ders';
+        
+                html += `
+                    <div class="border border-gray-800 rounded-xl bg-gray-800/40 overflow-hidden mb-3">
+                        <button onclick="toggleReviewAccordion('${bookId}', '${bookId}-icon')" class="w-full p-3 flex justify-between items-center text-left hover:bg-gray-800/70 transition">
+                            <div class="flex-1 pr-3">
+                                <div class="flex justify-between items-center mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold text-white text-xs sm:text-sm">${book.name || book.title || 'İsimsiz Kitap'}</span>
+                                        <span class="text-[10px] bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 px-2 py-0.5 rounded-full font-medium">${bookSubjectTag}</span>
+                                    </div>
+                                    <span class="text-indigo-400 font-semibold text-xs">%${bookPercent}</span>
+                                </div>
+                                <div class="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                                    <div class="bg-indigo-500 h-full rounded-full" style="width: ${bookPercent}%"></div>
+                                </div>
+                            </div>
+                            <i id="${bookId}-icon" class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform duration-200 ml-1"></i>
+                        </button>
+        
+                        <div id="${bookId}" class="hidden p-3 border-t border-gray-800 bg-gray-950/60">
+                            <p class="text-[10px] text-gray-400 uppercase tracking-wider mb-2 font-bold">Bölümler ve Konular</p>
+                            ${chaptersHtml}
+                        </div>
+                    </div>
+                `;
+            });
+        
+            container.innerHTML = html;
+        }
+        
+        // 5. Öğrenci İnceleme Ana Fonksiyonu
         async function selectStudentForReview(studentUid, studentEmail, studentName) {
             const detailsContainer = document.getElementById('selected-student-details');
             if (!detailsContainer) return;
         
-            // Yükleniyor Mesajı
             detailsContainer.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-full text-center py-12">
                     <div class="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mb-3"></div>
@@ -1961,11 +2127,10 @@
             `;
         
             try {
-                // 1. ÖĞRENCİ ANA DOKÜMANINI ÇEK
                 const userDocSnap = await db.collection("users").doc(studentUid).get();
                 const userData = userDocSnap.exists ? userDocSnap.data() : {};
         
-                // 2. KİTAPLARI ÇEK (Önce Alt Koleksiyondan, Yoksa Ana Dokümandan)
+                // Kitapları Çek
                 let booksList = [];
                 const booksSnap = await db.collection("users").doc(studentUid).collection("books").get().catch(() => null);
                 if (booksSnap && !booksSnap.empty) {
@@ -1974,7 +2139,33 @@
                     booksList = userData.books;
                 }
         
-                // 3. GÜNLÜK ÇALIŞMALARI ÇEK (Önce Alt Koleksiyondan, Yoksa Ana Dokümandan)
+                reviewStudentBooksCache = booksList;
+        
+                // Ders Navigasyonu İçin Benzersiz Ders Listesi
+                const subjectsSet = new Set();
+                booksList.forEach(b => {
+                    const subj = b.subject || b.ders;
+                    if (subj) subjectsSet.add(subj);
+                });
+                const subjectsList = Array.from(subjectsSet);
+        
+                let subjectNavHtml = `
+                    <button id="review-subj-btn-Tümü" onclick="filterReviewBooksBySubject('Tümü')" class="review-subject-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 text-white whitespace-nowrap transition">
+                        Tümü (${booksList.length})
+                    </button>
+                `;
+        
+                subjectsList.forEach(subj => {
+                    const count = booksList.filter(b => (b.subject || b.ders) === subj).length;
+                    const btnId = `review-subj-btn-${subj.replace(/\s+/g, '-')}`;
+                    subjectNavHtml += `
+                        <button id="${btnId}" onclick="filterReviewBooksBySubject('${subj}')" class="review-subject-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white whitespace-nowrap transition">
+                            ${subj} (${count})
+                        </button>
+                    `;
+                });
+        
+                // Günlük Çalışmaları Çek
                 let logsList = [];
                 const logsSnap = await db.collection("users").doc(studentUid).collection("studyLogs").orderBy("date", "desc").get().catch(() => null);
                 if (logsSnap && !logsSnap.empty) {
@@ -1987,70 +2178,6 @@
                     logsList = userData.logs;
                 }
         
-                // ==================== KİTAPLIK HTML (AKORDİYON) ====================
-                let booksHtml = '';
-                if (booksList.length === 0) {
-                    booksHtml = `<p class="text-gray-500 text-xs text-center py-8">Bu öğrenciye ait kayıtlı kitap bulunmuyor.</p>`;
-                } else {
-                    let bookIdx = 0;
-                    booksList.forEach(book => {
-                        bookIdx++;
-                        let bookCompleted = 0;
-                        let bookTotal = 0;
-                        let topicsHtml = '';
-        
-                        if (book.topics && Array.isArray(book.topics) && book.topics.length > 0) {
-                            book.topics.forEach(topic => {
-                                const comp = Number(topic.completedTests || 0);
-                                const tot = Number(topic.totalTests || 0);
-                                bookCompleted += comp;
-                                bookTotal += tot;
-                                const topPercent = tot > 0 ? Math.round((comp / tot) * 100) : 0;
-        
-                                topicsHtml += `
-                                    <div class="flex justify-between items-center text-xs p-2.5 bg-gray-900/80 rounded-lg border border-gray-800/80">
-                                        <div class="flex-1 pr-3">
-                                            <span class="font-medium text-gray-200">${topic.name || topic.topicName || 'Konu'}</span>
-                                            <div class="w-full bg-gray-800 h-1 rounded-full overflow-hidden mt-1">
-                                                <div class="bg-indigo-400 h-full rounded-full" style="width: ${topPercent}%"></div>
-                                            </div>
-                                        </div>
-                                        <span class="text-gray-400 text-[11px] font-mono">${comp}/${tot} Test (%${topPercent})</span>
-                                    </div>
-                                `;
-                            });
-                        } else {
-                            topicsHtml = `<p class="text-gray-500 text-[11px] py-1 text-center">Bu kitapta eklenmiş konu bulunmuyor.</p>`;
-                        }
-        
-                        const percent = bookTotal > 0 ? Math.round((bookCompleted / bookTotal) * 100) : 0;
-                        const bookContentId = `book-acc-${bookIdx}`;
-                        const bookIconId = `book-icon-${bookIdx}`;
-        
-                        booksHtml += `
-                            <div class="border border-gray-800 rounded-xl bg-gray-800/40 overflow-hidden mb-2">
-                                <button onclick="toggleReviewAccordion('${bookContentId}', '${bookIconId}')" class="w-full p-3 flex justify-between items-center text-left hover:bg-gray-800/70 transition">
-                                    <div class="flex-1 pr-3">
-                                        <div class="flex justify-between items-center mb-1">
-                                            <span class="font-bold text-white text-xs sm:text-sm">${book.name || 'İsimsiz Kitap'}</span>
-                                            <span class="text-indigo-400 font-semibold text-xs">%${percent}</span>
-                                        </div>
-                                        <div class="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                                            <div class="bg-indigo-500 h-full rounded-full" style="width: ${percent}%"></div>
-                                        </div>
-                                    </div>
-                                    <i id="${bookIconId}" class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform duration-200 ml-2"></i>
-                                </button>
-                                
-                                <div id="${bookContentId}" class="hidden p-3 border-t border-gray-800/80 bg-gray-950/50 space-y-2">
-                                    ${topicsHtml}
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-        
-                // ==================== GÜNLÜK LOG HTML (TARİHE GÖRE AKORDİYON) ====================
                 let logsHtml = '';
                 if (logsList.length === 0) {
                     logsHtml = `<p class="text-gray-500 text-xs text-center py-8">Bu öğrenciye ait çalışma günlüğü bulunmuyor.</p>`;
@@ -2104,7 +2231,7 @@
                     }
                 }
         
-                // ==================== ANA ARAYÜZ ŞABLONU ====================
+                // Panel Arayüz Şablonu
                 detailsContainer.innerHTML = `
                     <div class="flex flex-col h-full space-y-3">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-800 pb-3 gap-2">
@@ -2127,12 +2254,13 @@
                         </div>
         
                         <div class="flex-1 overflow-y-auto pr-1">
-                            <div id="review-tab-books" class="review-tab-content space-y-2">
-                                <div class="flex justify-between items-center mb-2">
-                                    <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">📚 Kitaplar ve Konu İlerlemeleri</h3>
-                                    <span class="text-[10px] text-gray-500">Konular için kitaba tıklayın</span>
+                            <div id="review-tab-books" class="review-tab-content space-y-3">
+                                <div class="flex items-center gap-1.5 overflow-x-auto pb-2 no-scrollbar border-b border-gray-800/60">
+                                    ${subjectNavHtml}
                                 </div>
-                                ${booksHtml}
+        
+                                <div id="review-books-accordion-container" class="space-y-2">
+                                </div>
                             </div>
         
                             <div id="review-tab-logs" class="review-tab-content hidden space-y-2">
@@ -2145,6 +2273,8 @@
                         </div>
                     </div>
                 `;
+        
+                renderReviewBooksAccordion(booksList);
         
             } catch (e) {
                 console.error("Öğrenci verileri okunamadı:", e);
