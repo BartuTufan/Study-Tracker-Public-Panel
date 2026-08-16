@@ -1583,25 +1583,33 @@
         // Kullanıcı oturum açtığında veya yetki değiştiğinde çalışacak ana kontrol
         async function checkUserRoleAndInitPanel() {
             if (!currentUser) return;
-        
+            
             try {
                 const userRef = db.collection("users").doc(currentUser.uid);
-                const userDoc = await userRef.get();
-        
-                const teacherPanelEl = document.getElementById('teacher-panel');
-                const studentMainEl = document.getElementById('student-main-content'); // Varsa ana öğrenci içeriği ID'niz
-        
-                if (userDoc.exists && (userDoc.data().role === 'teacher' || userDoc.data().role === 'admin')) {
-                    // Eğer kullanıcı öğretmense öğretmen panelini göster, öğrenci alanlarını gizle
-                    if (teacherPanelEl) teacherPanelEl.classList.remove('hidden');
-                    if (studentMainEl) studentMainEl.classList.add('hidden');
+                const doc = await userRef.get();
+                
+                const teacherPanel = document.getElementById('teacher-panel');
+                const studentNavTabs = document.getElementById('student-nav-tabs'); // 1. adımda eklediğimiz ID
+                
+                if (doc.exists && doc.data().role === 'teacher') {
+                    // ÖĞRETMEN GİRİŞİ: Öğrenci arayüzünü tamamen gizle, öğretmeni göster
+                    if (teacherPanel) teacherPanel.classList.remove('hidden');
+                    if (studentNavTabs) studentNavTabs.classList.add('hidden'); // Üst sekmeleri gizle
                     
-                    document.getElementById('teacher-email-display').innerText = `Yetkili: ${currentUser.email}`;
-                    await loadStudentsListForTeacher();
+                    // Açık olan öğrenci sekmelerinin içeriğini de gizleyelim
+                    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+                    
+                    // Öğretmen panelini başlat / verileri yükle (eğer varsa fonksiyonun)
+                    if (typeof loadTeacherDashboard === 'function') {
+                        loadTeacherDashboard();
+                    }
                 } else {
-                    // Öğrenci ise tam tersi
-                    if (teacherPanelEl) teacherPanelEl.classList.add('hidden');
-                    if (studentMainEl) studentMainEl.classList.remove('hidden');
+                    // ÖĞRENCİ GİRİŞİ: Öğretmen panelini gizle, öğrenci arayüzünü göster
+                    if (teacherPanel) teacherPanel.classList.add('hidden');
+                    if (studentNavTabs) studentNavTabs.classList.remove('hidden'); // Üst sekmeleri göster
+                    
+                    // Varsayılan öğrenci sekmesini aç
+                    switchTab('dashboard');
                 }
             } catch (e) {
                 console.error("Rol kontrolü başarısız:", e);
