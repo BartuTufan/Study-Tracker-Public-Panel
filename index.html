@@ -1956,24 +1956,45 @@
             detailsContainer.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-full text-center py-12">
                     <div class="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mb-3"></div>
-                    <p class="text-gray-400 text-sm font-medium">Öğrenci verileri yükleniyor...</p>
+                    <p class="text-gray-400 text-sm font-medium">Öğrenci verileri çekiliyor...</p>
                 </div>
             `;
         
             try {
-                // Firebase Verilerini Çek
-                const booksSnap = await db.collection("users").doc(studentUid).collection("books").get();
-                const logsSnap = await db.collection("users").doc(studentUid).collection("studyLogs").orderBy("date", "desc").get();
+                // 1. ÖĞRENCİ ANA DOKÜMANINI ÇEK
+                const userDocSnap = await db.collection("users").doc(studentUid).get();
+                const userData = userDocSnap.exists ? userDocSnap.data() : {};
+        
+                // 2. KİTAPLARI ÇEK (Önce Alt Koleksiyondan, Yoksa Ana Dokümandan)
+                let booksList = [];
+                const booksSnap = await db.collection("users").doc(studentUid).collection("books").get().catch(() => null);
+                if (booksSnap && !booksSnap.empty) {
+                    booksSnap.forEach(d => booksList.push(d.data()));
+                } else if (userData.books && Array.isArray(userData.books)) {
+                    booksList = userData.books;
+                }
+        
+                // 3. GÜNLÜK ÇALIŞMALARI ÇEK (Önce Alt Koleksiyondan, Yoksa Ana Dokümandan)
+                let logsList = [];
+                const logsSnap = await db.collection("users").doc(studentUid).collection("studyLogs").orderBy("date", "desc").get().catch(() => null);
+                if (logsSnap && !logsSnap.empty) {
+                    logsSnap.forEach(d => logsList.push(d.data()));
+                } else if (userData.studyLogs && Array.isArray(userData.studyLogs)) {
+                    logsList = userData.studyLogs;
+                } else if (userData.history && Array.isArray(userData.history)) {
+                    logsList = userData.history;
+                } else if (userData.logs && Array.isArray(userData.logs)) {
+                    logsList = userData.logs;
+                }
         
                 // ==================== KİTAPLIK HTML (AKORDİYON) ====================
                 let booksHtml = '';
-                if (booksSnap.empty) {
+                if (booksList.length === 0) {
                     booksHtml = `<p class="text-gray-500 text-xs text-center py-8">Bu öğrenciye ait kayıtlı kitap bulunmuyor.</p>`;
                 } else {
                     let bookIdx = 0;
-                    booksSnap.forEach(doc => {
+                    booksList.forEach(book => {
                         bookIdx++;
-                        const book = doc.data();
                         let bookCompleted = 0;
                         let bookTotal = 0;
                         let topicsHtml = '';
@@ -2031,13 +2052,11 @@
         
                 // ==================== GÜNLÜK LOG HTML (TARİHE GÖRE AKORDİYON) ====================
                 let logsHtml = '';
-                if (logsSnap.empty) {
+                if (logsList.length === 0) {
                     logsHtml = `<p class="text-gray-500 text-xs text-center py-8">Bu öğrenciye ait çalışma günlüğü bulunmuyor.</p>`;
                 } else {
-                    // Tarihlere Göre Gruplama
                     const groupedLogs = {};
-                    logsSnap.forEach(doc => {
-                        const log = doc.data();
+                    logsList.forEach(log => {
                         const dateKey = log.date || 'Tarihsiz';
                         if (!groupedLogs[dateKey]) groupedLogs[dateKey] = [];
                         groupedLogs[dateKey].push(log);
@@ -2046,17 +2065,17 @@
                     let dateIdx = 0;
                     for (const [dateStr, logs] of Object.entries(groupedLogs)) {
                         dateIdx++;
-                        const dateTotalQuestions = logs.reduce((sum, item) => sum + Number(item.questionCount || 0), 0);
+                        const dateTotalQuestions = logs.reduce((sum, item) => sum + Number(item.questionCount || item.questionsSolved || item.count || 0), 0);
                         
                         let sessionItemsHtml = '';
                         logs.forEach(log => {
                             sessionItemsHtml += `
                                 <div class="flex justify-between items-center p-2.5 bg-gray-900/80 rounded-lg border border-gray-800/80 text-xs">
                                     <div>
-                                        <p class="font-semibold text-gray-200">${log.subject || 'Ders'} - ${log.topic || 'Konu'}</p>
+                                        <p class="font-semibold text-gray-200">${log.subject || log.title || 'Ders'} ${log.topic ? '- ' + log.topic : ''}</p>
                                         ${log.note ? `<p class="text-[11px] text-gray-400 mt-0.5">${log.note}</p>` : ''}
                                     </div>
-                                    <span class="text-green-400 font-bold text-xs bg-green-950/50 px-2 py-1 rounded border border-green-800/40">${log.questionCount || 0} Soru</span>
+                                    <span class="text-green-400 font-bold text-xs bg-green-950/50 px-2 py-1 rounded border border-green-800/40">${log.questionCount || log.questionsSolved || log.count || 0} Soru</span>
                                 </div>
                             `;
                         });
