@@ -430,11 +430,23 @@
                 document.getElementById('user-avatar').src = user.photoURL || '';
                 document.getElementById('sync-status').innerText = `Bulut Senkronize: ${user.displayName || user.email}`;
                 
-                await db.collection("users").doc(user.uid).set({
-                    displayName: user.displayName || '',
-                    email: user.email || '',
-                    role: "student" // Varsayılan rol
-                }, { merge: true });
+                const userRef = db.collection("users").doc(user.uid);
+                const userDoc = await userRef.get();
+        
+                if (!userDoc.exists || !userDoc.data().role) {
+                    // Sadece rolü YOKSA varsayılan olarak 'student' atıyoruz
+                    await userRef.set({
+                        displayName: user.displayName || '',
+                        email: user.email || '',
+                        role: "student"
+                    }, { merge: true });
+                } else {
+                    // Rolü zaten varsa (örneğin teacher ise) sadece isim ve e-postayı güncelliyoruz, ROLÜ DEĞİŞTİRMİYORUZ
+                    await userRef.set({
+                        displayName: user.displayName || '',
+                        email: user.email || ''
+                    }, { merge: true });
+                }
                 
                 // Başka hesaptan kalan veriyi temizle ve Google hesabının verisini yükle
                 state = createDefaultState();
