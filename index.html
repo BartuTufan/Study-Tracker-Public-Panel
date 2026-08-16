@@ -1943,19 +1943,19 @@
             }
         }
 
-        // 1. Öğrenci listesini çekerken kartlara tıklama özelliğini (onclick) ekleyen güncel fonksiyon:
+        // 1. Öğrenci listesini çizen ve kartlara tıklandığında "selectStudent" fonksiyonunu çağıran güncel fonksiyon
         function renderTeacherStudents(studentsList) {
             const container = document.getElementById('teacher-students-list');
             if (!container) return;
             
             if (!studentsList || studentsList.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Henüz öğrenci eklenmedi.</p>';
+                container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Henüz kayıtlı öğrenci bulunmuyor.</p>';
                 return;
             }
         
             let html = '';
             studentsList.forEach(student => {
-                // BURAYA DİKKAT: Her öğrenci kartına onclick="selectStudent(...)" ekliyoruz!
+                // BURASI ÖNEMLİ: Her öğrenci kartına onclick ekliyoruz
                 html += `
                     <div onclick="selectStudent('${student.id}', '${student.displayName || student.email}')" 
                          class="p-3 bg-gray-800 hover:bg-gray-700 cursor-pointer rounded-xl flex items-center justify-between transition border border-gray-700/50">
@@ -1970,7 +1970,7 @@
             container.innerHTML = html;
         }
         
-        // 2. Bir öğrenciye tıklandığında çalışacak ve detay panelini açacak ana fonksiyon:
+        // 2. Bir öğrenciye tıklandığında çalışan ana tetikleyici fonksiyon
         let currentSelectedStudentId = null;
         
         async function selectStudent(studentId, studentName) {
@@ -1981,22 +1981,22 @@
             if (headerContainer) {
                 headerContainer.innerHTML = `
                     <h2 class="text-lg font-bold text-white">👤 ${studentName}</h2>
-                    <p class="text-xs text-indigo-400">Seçilen öğrencinin verileri inceleniyor...</p>
+                    <p class="text-xs text-indigo-400">Öğrenci verileri ve kitaplığı yükleniyor...</p>
                 `;
             }
         
-            // Detay içerik alanını görünür yap
+            // Detay panelini görünür yap
             const detailContent = document.getElementById('student-detail-content');
             if (detailContent) {
                 detailContent.classList.remove('hidden');
             }
         
-            // Varsayılan olarak Kitaplık sekmesini yükle
+            // Varsayılan olarak kitaplık sekmesini aç
             switchStudentTab('library');
             loadStudentLibrary(studentId);
         }
         
-        // 3. Sekmeler arası geçiş fonksiyonu (Kitaplık <-> Günlük Çalışmalar)
+        // 3. Sekmeler arası geçiş (Kitaplık <-> Günlük Çalışmalar)
         function switchStudentTab(tabName) {
             const libTab = document.getElementById('st-tab-library');
             const logsTab = document.getElementById('st-tab-logs');
@@ -2020,14 +2020,13 @@
             }
         }
         
-        // 4. Öğrencinin Kitaplık ve Derslerini çeken fonksiyon
+        // 4. Seçilen öğrencinin derslerini listeleyen fonksiyon
         async function loadStudentLibrary(studentId) {
             const subjectsGrid = document.getElementById('student-subjects-grid');
             const booksContainer = document.getElementById('student-books-container');
             
             if (!subjectsGrid || !booksContainer) return;
         
-            // Sabit ders listesi (veya sistemindeki dersler)
             const subjects = [
                 { id: 'turkce', name: 'Türkçe', icon: 'fa-book-open' },
                 { id: 'matematik', name: 'Matematik', icon: 'fa-square-root-variable' },
@@ -2051,7 +2050,7 @@
             booksContainer.innerHTML = '<p class="text-gray-500 text-sm text-center py-6">İncelemek için yukarıdan bir ders seçin.</p>';
         }
         
-        // 5. Seçilen dersin kitaplarını ve konu ilerlemelerini öğrencinin veritabanından çeken fonksiyon
+        // 5. Seçilen derse ait kitap ve konu verilerini Firebase'den çeken fonksiyon
         async function loadStudentBooksForSubject(studentId, subjectKey, subjectName) {
             const booksContainer = document.getElementById('student-books-container');
             if (!booksContainer) return;
@@ -2059,27 +2058,25 @@
             booksContainer.innerHTML = `<p class="text-gray-400 text-sm text-center py-4">${subjectName} kitapları yükleniyor...</p>`;
         
             try {
-                // Öğrencinin Firestore'daki özel veri dokümanına erişim (state veya books koleksiyonu)
                 const docRef = db.collection('users').doc(studentId).collection('data').doc('state');
                 const docSnap = await docRef.get();
         
                 if (!docSnap.exists) {
-                    booksContainer.innerHTML = `<p class="text-gray-500 text-sm text-center py-4">Bu öğrenciye ait kitap verisi bulunamadı.</p>`;
+                    booksContainer.innerHTML = `<p class="text-gray-500 text-sm text-center py-4">Bu öğrenciye ait veri bulunamadı.</p>`;
                     return;
                 }
         
                 const studentData = docSnap.data();
                 const books = studentData.books || [];
                 
-                // Seçilen derse ait kitapları filtrele
                 const filteredBooks = books.filter(b => b.subject === subjectKey || b.subjectId === subjectKey || (b.category && b.category.toLowerCase() === subjectKey.toLowerCase()));
         
                 if (filteredBooks.length === 0) {
-                    booksContainer.innerHTML = `<p class="text-gray-500 text-sm text-center py-4">${subjectName} dersine ait eklenmiş kitap bulunmuyor.</p>`;
+                    booksContainer.innerHTML = `<p class="text-gray-500 text-sm text-center py-4">${subjectName} dersine ait kitap eklenmemiş.</p>`;
                     return;
                 }
         
-                let html = `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${subjectName} Kitapları ve Konuları</h4>`;
+                let html = `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${subjectName} Kitapları</h4>`;
                 
                 filteredBooks.forEach(book => {
                     html += `
@@ -2116,7 +2113,7 @@
         
             } catch (e) {
                 console.error("Kitaplar yüklenirken hata:", e);
-                booksContainer.innerHTML = `<p class="text-red-400 text-sm text-center py-4">Kitap verileri okunurken bir hata oluştu.</p>`;
+                booksContainer.innerHTML = `<p class="text-red-400 text-sm text-center py-4">Kitap verileri okunurken hata oluştu.</p>`;
             }
         }
     </script>
