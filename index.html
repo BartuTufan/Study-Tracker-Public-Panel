@@ -87,43 +87,64 @@
     <main class="max-w-6xl mx-auto px-4 py-6 sm:py-8">
         <main class="max-w-6xl mx-auto px-4 py-6 sm:py-8">
         
-            <div id="teacher-panel" class="hidden min-h-[70vh] bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl mb-6">
-                <header class="flex justify-between items-center bg-gray-950 border border-gray-800 p-4 rounded-xl mb-6">
-                    <div>
-                        <h1 class="text-xl font-black text-indigo-400 flex items-center gap-2">
-                            👨‍🏫 Öğretmen / Koç Takip Paneli
-                        </h1>
-                        <p id="teacher-email-display" class="text-xs text-gray-400">Yetkili Oturum</p>
-                    </div>
-                </header>
-            
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="bg-gray-950 border border-gray-800 rounded-xl p-5 shadow-lg lg:col-span-1">
-                        <h2 class="text-md font-bold mb-4 text-gray-200 flex items-center justify-between">
-                            <span>📚 Öğrencilerim</span>
-                            <span id="student-count-badge" class="text-xs bg-indigo-600/30 text-indigo-400 px-2 py-0.5 rounded-full">0 Kayıt</span>
-                        </h2>
-                        <div id="students-list-container" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-                            <p class="text-gray-500 text-sm text-center py-4">Öğrenciler yükleniyor...</p>
+            <div id="teacher-panel" class="hidden space-y-6">
+        
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-900 p-5 rounded-2xl border border-gray-800 gap-4 shadow-xl">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-indigo-600/20 text-indigo-400 p-3 rounded-xl border border-indigo-500/30">
+                            <i class="fa-solid fa-chalkboard-user text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-white">Öğretmen / Koç Takip Paneli</h1>
+                            <p class="text-xs text-gray-400">Öğrencilerinizi ekleyin ve çalışma istatistiklerini güvenle takip edin.</p>
                         </div>
                     </div>
-            
-                    <div class="bg-gray-950 border border-gray-800 rounded-xl p-6 shadow-lg lg:col-span-2 flex flex-col">
-                        <div id="selected-student-header" class="border-b border-gray-800 pb-4 mb-4">
-                            <h2 class="text-lg font-bold text-white">Öğrenci Veri İncelemesi</h2>
-                            <p class="text-xs text-gray-400">Sol menüden bir öğrenci seçerek detayları görüntüleyin.</p>
+                    
+                    <button onclick="openAddStudentModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition flex items-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer">
+                        <i class="fa-solid fa-user-plus"></i>
+                        Öğrenci Ekle
+                    </button>
+                </div>
+        
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl flex flex-col h-[500px]">
+                        <h3 class="text-sm font-bold text-gray-300 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-users text-indigo-400"></i> Öğrencilerim
+                        </h3>
+                        <div id="teacher-students-list" class="space-y-2 overflow-y-auto flex-1 pr-1">
+                            <p class="text-gray-500 text-xs text-center py-8">Henüz eklenmiş öğrenci yok.</p>
                         </div>
-            
-                        <div class="flex gap-2 mb-4 border-b border-gray-800 pb-3">
-                            <button onclick="switchTeacherTab('books')" id="tab-btn-books" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white transition">Kitap İlerlemeleri</button>
-                            <button onclick="switchTeacherTab('logs')" id="tab-btn-logs" class="px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition">Günlük Çalışma Logları</button>
-                        </div>
-            
-                        <div id="teacher-student-content" class="flex-1 overflow-y-auto max-h-[50vh] space-y-3 pr-2">
-                            <div class="flex flex-col items-center justify-center h-48 text-center text-gray-500">
-                                <p class="text-sm">Henüz bir öğrenci seçilmedi.</p>
+                    </div>
+                    
+                    <div id="selected-student-details" class="md:col-span-2 bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl flex flex-col h-[500px] overflow-y-auto">
+                        <div class="flex flex-col items-center justify-center h-full text-center py-12">
+                            <div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 mb-3">
+                                <i class="fa-solid fa-arrow-pointer text-lg"></i>
                             </div>
+                            <p class="text-gray-400 text-sm font-medium">İncelemek için soldaki listeden bir öğrenci seçin.</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+        
+            <div id="add-student-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+                <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl animate-fadeIn">
+                    <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-user-plus text-indigo-400"></i> Sisteme Öğrenci Ekle
+                        </h3>
+                        <button onclick="closeAddStudentModal()" class="text-gray-400 hover:text-white text-lg font-bold">&times;</button>
+                    </div>
+                    <p class="text-xs text-gray-400">Takip etmek istediğiniz öğrencinin sistemde kayıtlı e-posta adresini girin. Böylece öğrencinin verileri güvenle eşleşecektir.</p>
+                    
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Öğrenci E-posta Adresi</label>
+                        <input type="email" id="student-email-input" placeholder="ornek@ogrenci.com" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                    
+                    <div class="flex justify-end gap-2 pt-3 border-t border-gray-800">
+                        <button onclick="closeAddStudentModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm transition font-medium">İptal</button>
+                        <button onclick="addStudentByEmail()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-indigo-600/20">Öğrenciyi Ekle</button>
                     </div>
                 </div>
             </div>
@@ -1589,26 +1610,22 @@
                 const doc = await userRef.get();
                 
                 const teacherPanel = document.getElementById('teacher-panel');
-                const studentNavTabs = document.getElementById('student-nav-tabs'); // 1. adımda eklediğimiz ID
-                
+                const studentNavTabs = document.getElementById('student-nav-tabs');
+        
                 if (doc.exists && doc.data().role === 'teacher') {
-                    // ÖĞRETMEN GİRİŞİ: Öğrenci arayüzünü tamamen gizle, öğretmeni göster
+                    // ÖĞRETMEN GİRİŞİ
                     if (teacherPanel) teacherPanel.classList.remove('hidden');
-                    if (studentNavTabs) studentNavTabs.classList.add('hidden'); // Üst sekmeleri gizle
+                    if (studentNavTabs) studentNavTabs.classList.add('hidden');
                     
-                    // Açık olan öğrenci sekmelerinin içeriğini de gizleyelim
                     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
                     
-                    // Öğretmen panelini başlat / verileri yükle (eğer varsa fonksiyonun)
-                    if (typeof loadTeacherDashboard === 'function') {
-                        loadTeacherDashboard();
-                    }
+                    // BURAYA DİKKAT: Öğretmen panel açıldığında öğrencileri listele fonksiyonunu çağırıyoruz:
+                    loadTeacherStudents(); 
+        
                 } else {
-                    // ÖĞRENCİ GİRİŞİ: Öğretmen panelini gizle, öğrenci arayüzünü göster
+                    // ÖĞRENCİ GİRİŞİ
                     if (teacherPanel) teacherPanel.classList.add('hidden');
-                    if (studentNavTabs) studentNavTabs.classList.remove('hidden'); // Üst sekmeleri göster
-                    
-                    // Varsayılan öğrenci sekmesini aç
+                    if (studentNavTabs) studentNavTabs.classList.remove('hidden');
                     switchTab('dashboard');
                 }
             } catch (e) {
@@ -1760,6 +1777,158 @@
             }
         }
         // ================= BİTİŞ =================
+        // ================= ÖĞRENCİ EKLEME VE YÖNETİM SİSTEMİ =================
+
+        // Modal Açma / Kapatma Fonksiyonları
+        function openAddStudentModal() {
+            document.getElementById('add-student-modal').classList.remove('hidden');
+        }
+
+        function closeAddStudentModal() {
+            document.getElementById('add-student-modal').classList.add('hidden');
+            document.getElementById('student-email-input').value = '';
+        }
+
+        // E-posta Adresi ile Öğrenci Ekleme
+        async function addStudentByEmail() {
+            const emailInput = document.getElementById('student-email-input');
+            const email = emailInput.value.trim().toLowerCase();
+
+            if (!email) {
+                alert("Lütfen geçerli bir e-posta adresi girin.");
+                return;
+            }
+
+            if (!currentUser || currentUser.email.toLowerCase() === email) {
+                alert("Kendi hesabınızı öğrenci olarak ekleyemezsiniz.");
+                return;
+            }
+
+            try {
+                // 1. Veritabanındaki 'users' koleksiyonunda bu e-postaya sahip öğrenciyi arıyoruz
+                const usersRef = db.collection("users");
+                const snapshot = await usersRef.where("email", "==", email).get();
+
+                if (snapshot.empty) {
+                    alert("Bu e-posta adresine sahip bir öğrenci sistemde bulunamadı.");
+                    return;
+                }
+
+                let studentDocId = null;
+                let studentData = null;
+
+                snapshot.forEach(doc => {
+                    studentDocId = doc.id;
+                    studentData = doc.data();
+                });
+
+                // 2. Öğretmenin altındaki 'students' koleksiyonuna bu öğrenciyi güvenle kaydediyoruz
+                const teacherStudentRef = db.collection("teachers").doc(currentUser.uid).collection("students").doc(studentDocId);
+                
+                await teacherStudentRef.set({
+                    studentUid: studentDocId,
+                    displayName: studentData.displayName || "İsimsiz Öğrenci",
+                    email: studentData.email,
+                    addedAt: new Date().toISOString()
+                });
+
+                alert("Öğrenci başarıyla öğrencilerim listesine eklendi!");
+                closeAddStudentModal();
+                loadTeacherStudents(); // Listeyi tazele
+
+            } catch (error) {
+                console.error("Öğrenci eklenirken hata oluştu:", error);
+                alert("Öğrenci eklenemedi. Lütfen internet bağlantınızı ve yetkilerinizi kontrol edin.");
+            }
+        }
+
+        // Öğretmenin Kendi Eklediği Öğrencileri Listelemesi
+        async function loadTeacherStudents() {
+            if (!currentUser) return;
+            const container = document.getElementById('teacher-students-list');
+            
+            try {
+                const studentsSnap = await db.collection("teachers").doc(currentUser.uid).collection("students").get();
+                
+                if (studentsSnap.empty) {
+                    container.innerHTML = '<p class="text-gray-500 text-xs text-center py-8">Henüz eklenmiş öğrenci yok.</p>';
+                    return;
+                }
+
+                let html = '';
+                studentsSnap.forEach(doc => {
+                    const student = doc.data();
+                    html += `
+                        <div onclick="selectStudentForReview('${student.studentUid}', '${student.displayName}')" class="p-3 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/50 rounded-xl cursor-pointer transition flex items-center justify-between group">
+                            <div>
+                                <p class="font-bold text-white text-sm group-hover:text-indigo-400 transition">${student.displayName}</p>
+                                <p class="text-xs text-gray-400">${student.email}</p>
+                            </div>
+                            <span class="text-xs bg-indigo-500/10 text-indigo-400 px-2.5 py-1 rounded-lg border border-indigo-500/20">İncele</span>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+
+            } catch (e) {
+                console.error("Öğrenciler yüklenemedi:", e);
+                container.innerHTML = '<p class="text-red-400 text-xs text-center py-4">Öğrenci listesi alınamadı.</p>';
+            }
+        }
+
+        // Seçilen Öğrencinin Verilerini Gizliliği Sağlayarak Güvenli Çekme
+        async function selectStudentForReview(studentUid, studentName) {
+            const detailsContainer = document.getElementById('selected-student-details');
+            detailsContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full py-12">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mb-2"></div>
+                    <p class="text-gray-400 text-sm">${studentName} verileri yükleniyor...</p>
+                </div>
+            `;
+
+            try {
+                // Öğrencinin çalışma günlüklerini (dailyLogs) çekiyoruz
+                const logsSnap = await db.collection("users").doc(studentUid).collection("dailyLogs").get();
+                
+                let html = `
+                    <div class="space-y-4">
+                        <div class="border-b border-gray-800 pb-3 flex justify-between items-center">
+                            <div>
+                                <h3 class="text-base font-bold text-white">${studentName} - Çalışma Raporu</h3>
+                                <p class="text-xs text-gray-400">Hesap gizliliği korumalı öğrenci görünümü</p>
+                            </div>
+                        </div>
+                        <div class="space-y-2.5">
+                `;
+
+                if (logsSnap.empty) {
+                    html += '<p class="text-gray-500 text-xs text-center py-12">Bu öğrenciye ait kayıtlı çalışma günlüğü bulunmuyor.</p>';
+                } else {
+                    logsSnap.forEach(doc => {
+                        const log = doc.data();
+                        html += `
+                            <div class="p-3 bg-gray-800/30 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
+                                <div>
+                                    <p class="font-bold text-white text-xs sm:text-sm">${log.subject || 'Ders'} - ${log.topic || 'Konu'}</p>
+                                    <p class="text-[11px] text-gray-400">${log.date || ''}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-green-400 font-bold text-xs sm:text-sm">${log.questionCount || 0} Soru</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                html += `</div></div>`;
+                detailsContainer.innerHTML = html;
+
+            } catch (e) {
+                console.error("Öğrenci verileri okunamadı:", e);
+                detailsContainer.innerHTML = '<p class="text-red-400 text-sm text-center py-12">Bu öğrencinin verilerine erişim izniniz yok veya bir hata oluştu.</p>';
+            }
+        }
+        // =========================================================================
     </script>
 </body>
 </html>
