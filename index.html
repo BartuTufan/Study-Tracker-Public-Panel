@@ -2119,6 +2119,182 @@
                 container.innerHTML = `<p class="text-red-400 text-sm text-center py-6">Günlük kayıtlar yüklenirken bir hata oluştu veya alt koleksiyon bulunamadı.</p>`;
             }
         }
+        // 1. Öğrenci listesini çekerken kartlara tıklama özelliğini (onclick) ekleyen güncel fonksiyon:
+        function renderTeacherStudents(studentsList) {
+            const container = document.getElementById('teacher-students-list');
+            if (!container) return;
+            
+            if (!studentsList || studentsList.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Henüz öğrenci eklenmedi.</p>';
+                return;
+            }
+        
+            let html = '';
+            studentsList.forEach(student => {
+                // BURAYA DİKKAT: Her öğrenci kartına onclick="selectStudent(...)" ekliyoruz!
+                html += `
+                    <div onclick="selectStudent('${student.id}', '${student.displayName || student.email}')" 
+                         class="p-3 bg-gray-800 hover:bg-gray-700 cursor-pointer rounded-xl flex items-center justify-between transition border border-gray-700/50">
+                        <div>
+                            <p class="font-bold text-white text-sm">${student.displayName || 'İsimsiz Öğrenci'}</p>
+                            <p class="text-xs text-gray-400">${student.email || ''}</p>
+                        </div>
+                        <span class="text-xs bg-indigo-600/30 text-indigo-400 px-2.5 py-1 rounded-lg font-medium">İncele <i class="fa-solid fa-chevron-right ml-1"></i></span>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+        
+        // 2. Bir öğrenciye tıklandığında çalışacak ve detay panelini açacak ana fonksiyon:
+        let currentSelectedStudentId = null;
+        
+        async function selectStudent(studentId, studentName) {
+            currentSelectedStudentId = studentId;
+            
+            // Sağ üst başlığı güncelle
+            const headerContainer = document.getElementById('selected-student-header');
+            if (headerContainer) {
+                headerContainer.innerHTML = `
+                    <h2 class="text-lg font-bold text-white">👤 ${studentName}</h2>
+                    <p class="text-xs text-indigo-400">Seçilen öğrencinin verileri inceleniyor...</p>
+                `;
+            }
+        
+            // Detay içerik alanını görünür yap
+            const detailContent = document.getElementById('student-detail-content');
+            if (detailContent) {
+                detailContent.classList.remove('hidden');
+            }
+        
+            // Varsayılan olarak Kitaplık sekmesini yükle
+            switchStudentTab('library');
+            loadStudentLibrary(studentId);
+        }
+        
+        // 3. Sekmeler arası geçiş fonksiyonu (Kitaplık <-> Günlük Çalışmalar)
+        function switchStudentTab(tabName) {
+            const libTab = document.getElementById('st-tab-library');
+            const logsTab = document.getElementById('st-tab-logs');
+            const libContent = document.getElementById('st-content-library');
+            const logsContent = document.getElementById('st-content-logs');
+        
+            if (!libTab || !logsTab || !libContent || !logsContent) return;
+        
+            if (tabName === 'library') {
+                libTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-indigo-600 text-white transition";
+                logsTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-gray-800 text-gray-400 hover:text-white transition";
+                libContent.classList.remove('hidden');
+                logsContent.classList.add('hidden');
+                if (currentSelectedStudentId) loadStudentLibrary(currentSelectedStudentId);
+            } else {
+                logsTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-indigo-600 text-white transition";
+                libTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-gray-800 text-gray-400 hover:text-white transition";
+                logsContent.classList.remove('hidden');
+                libContent.classList.add('hidden');
+                if (currentSelectedStudentId) loadStudentDailyLogs(currentSelectedStudentId);
+            }
+        }
+        
+        // 4. Öğrencinin Kitaplık ve Derslerini çeken fonksiyon
+        async function loadStudentLibrary(studentId) {
+            const subjectsGrid = document.getElementById('student-subjects-grid');
+            const booksContainer = document.getElementById('student-books-container');
+            
+            if (!subjectsGrid || !booksContainer) return;
+        
+            // Sabit ders listesi (veya sistemindeki dersler)
+            const subjects = [
+                { id: 'turkce', name: 'Türkçe', icon: 'fa-book-open' },
+                { id: 'matematik', name: 'Matematik', icon: 'fa-square-root-variable' },
+                { id: 'fizik', name: 'Fizik', icon: 'fa-atom' },
+                { id: 'kimya', name: 'Kimya', icon: 'fa-flask' },
+                { id: 'biyoloji', name: 'Biyoloji', icon: 'fa-dna' },
+                { id: 'sosyal', name: 'Sosyal Bilgiler', icon: 'fa-globe' }
+            ];
+        
+            let gridHtml = '';
+            subjects.forEach(sub => {
+                gridHtml += `
+                    <button onclick="loadStudentBooksForSubject('${studentId}', '${sub.id}', '${sub.name}')" 
+                            class="p-3 bg-gray-800 hover:bg-indigo-600/40 border border-gray-700/50 rounded-xl text-left transition flex items-center gap-2.5 text-white text-sm font-medium">
+                        <i class="fa-solid ${sub.icon} text-indigo-400"></i>
+                        <span>${sub.name}</span>
+                    </button>
+                `;
+            });
+            subjectsGrid.innerHTML = gridHtml;
+            booksContainer.innerHTML = '<p class="text-gray-500 text-sm text-center py-6">İncelemek için yukarıdan bir ders seçin.</p>';
+        }
+        
+        // 5. Seçilen dersin kitaplarını ve konu ilerlemelerini öğrencinin veritabanından çeken fonksiyon
+        async function loadStudentBooksForSubject(studentId, subjectKey, subjectName) {
+            const booksContainer = document.getElementById('student-books-container');
+            if (!booksContainer) return;
+        
+            booksContainer.innerHTML = `<p class="text-gray-400 text-sm text-center py-4">${subjectName} kitapları yükleniyor...</p>`;
+        
+            try {
+                // Öğrencinin Firestore'daki özel veri dokümanına erişim (state veya books koleksiyonu)
+                const docRef = db.collection('users').doc(studentId).collection('data').doc('state');
+                const docSnap = await docRef.get();
+        
+                if (!docSnap.exists) {
+                    booksContainer.innerHTML = `<p class="text-gray-500 text-sm text-center py-4">Bu öğrenciye ait kitap verisi bulunamadı.</p>`;
+                    return;
+                }
+        
+                const studentData = docSnap.data();
+                const books = studentData.books || [];
+                
+                // Seçilen derse ait kitapları filtrele
+                const filteredBooks = books.filter(b => b.subject === subjectKey || b.subjectId === subjectKey || (b.category && b.category.toLowerCase() === subjectKey.toLowerCase()));
+        
+                if (filteredBooks.length === 0) {
+                    booksContainer.innerHTML = `<p class="text-gray-500 text-sm text-center py-4">${subjectName} dersine ait eklenmiş kitap bulunmuyor.</p>`;
+                    return;
+                }
+        
+                let html = `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${subjectName} Kitapları ve Konuları</h4>`;
+                
+                filteredBooks.forEach(book => {
+                    html += `
+                        <div class="bg-gray-800/50 border border-gray-700 rounded-xl p-3 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-white text-sm">📖 ${book.name || 'Kitap'}</span>
+                            </div>
+                            <div class="space-y-1 pl-2">
+                    `;
+                    
+                    if (book.topics && book.topics.length > 0) {
+                        book.topics.forEach(topic => {
+                            const comp = topic.completedTests || 0;
+                            const tot = topic.totalTests || 1;
+                            const percent = Math.round((comp / tot) * 100);
+                            
+                            html += `
+                                <div class="flex justify-between items-center text-xs py-1 border-b border-gray-800 last:border-0">
+                                    <span class="text-gray-300">${topic.name}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-indigo-400 font-semibold">${comp}/${tot} Test (${percent}%)</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        html += `<p class="text-xs text-gray-500">Bu kitapta konu bulunmuyor.</p>`;
+                    }
+                    
+                    html += `</div></div>`;
+                });
+        
+                booksContainer.innerHTML = html;
+        
+            } catch (e) {
+                console.error("Kitaplar yüklenirken hata:", e);
+                booksContainer.innerHTML = `<p class="text-red-400 text-sm text-center py-4">Kitap verileri okunurken bir hata oluştu.</p>`;
+            }
+        }
     </script>
 </body>
 </html>
