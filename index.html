@@ -90,10 +90,51 @@
             <div id="teacher-panel" class="hidden min-h-screen bg-gray-950 text-gray-100 p-6 rounded-xl mb-6">
                  ...
             </div>
+            <div id="teacher-panel" class="hidden min-h-[70vh] bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl mb-6">
+                <header class="flex justify-between items-center bg-gray-950 border border-gray-800 p-4 rounded-xl mb-6">
+                    <div>
+                        <h1 class="text-xl font-black text-indigo-400 flex items-center gap-2">
+                            👨‍🏫 Öğretmen / Koç Takip Paneli
+                        </h1>
+                        <p id="teacher-email-display" class="text-xs text-gray-400">Yetkili Oturum</p>
+                    </div>
+                </header>
+    
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <div class="bg-gray-950 border border-gray-800 rounded-xl p-5 shadow-lg lg:col-span-1">
+                        <h2 class="text-md font-bold mb-4 text-gray-200 flex items-center justify-between">
+                            <span>📚 Öğrencilerim</span>
+                            <span id="student-count-badge" class="text-xs bg-indigo-600/30 text-indigo-400 px-2 py-0.5 rounded-full">0 Kayıt</span>
+                        </h2>
+                        <div id="students-list-container" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                            <p class="text-gray-500 text-sm text-center py-4">Öğrenciler yükleniyor...</p>
+                        </div>
+                    </div>
+    
+                    <div class="bg-gray-950 border border-gray-800 rounded-xl p-6 shadow-lg lg:col-span-2 flex flex-col">
+                        <div id="selected-student-header" class="border-b border-gray-800 pb-4 mb-4">
+                            <h2 class="text-lg font-bold text-white">Öğrenci Veri İncelemesi</h2>
+                            <p class="text-xs text-gray-400">Sol menüden bir öğrenci seçerek kitap ilerlemelerini ve günlük çalışmalarını görüntüleyin.</p>
+                        </div>
+    
+                        <div class="flex gap-2 mb-4 border-b border-gray-800 pb-3">
+                            <button onclick="switchTeacherTab('books')" id="tab-btn-books" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white transition">Kitap İlerlemeleri</button>
+                            <button onclick="switchTeacherTab('logs')" id="tab-btn-logs" class="px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition">Günlük Çalışma Logları</button>
+                        </div>
+    
+                        <div id="teacher-student-content" class="flex-1 overflow-y-auto max-h-[50vh] space-y-3 pr-2">
+                            <div class="flex flex-col items-center justify-center h-48 text-center text-gray-500">
+                                <p class="text-sm">Henüz bir öğrenci seçilmedi.</p>
+                            </div>
+                        </div>
+                    </div>
+    
+                </div>
+            </div>
             <div id="dashboard" class="tab-content active space-y-6">
                 <div class="glass-panel p-5 sm:p-6 flex flex-col sm:flex-row items-center...
         
-        <div id="dashboard" class="tab-content active space-y-6">
             <div class="glass-panel p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
                 <div class="flex items-center gap-4 w-full sm:w-auto">
                     <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-orange-500/20 text-orange-500 flex items-center justify-center text-2xl sm:text-3xl shadow-[0_0_20px_rgba(249,115,22,0.3)] z-10 shrink-0">
@@ -1540,49 +1581,206 @@
             document.getElementById('logDate').value = getTodayStr();
         };
 
-        // --- ÖĞRETMEN PANELİ FONKSİYONLARI BAŞLANGICI ---
-        async function checkUserRoleAndInitPanel() {
-            if (!currentUser) return;
-            try {
-                const userRef = db.collection("users").doc(currentUser.uid);
-                const userDoc = await userRef.get();
-                let userRole = "student";
-                if (userDoc.exists && userDoc.data().role) {
-                    userRole = userDoc.data().role;
-                } else {
-                    await userRef.set({ role: "student", email: currentUser.email }, { merge: true });
+        javascript
+            // --- ÖĞRETMEN PANELİ VE ROL YÖNETİMİ (TAM VE ÇALIŞAN KOD) ---
+            async function checkUserRoleAndInitPanel() {
+                if (!currentUser) return;
+                try {
+                    const userRef = db.collection("users").doc(currentUser.uid);
+                    const userDoc = await userRef.get();
+                    let userRole = "student";
+                    
+                    if (userDoc.exists && userDoc.data().role) {
+                        userRole = userDoc.data().role;
+                    } else {
+                        await userRef.set({ role: "student", email: currentUser.email }, { merge: true });
+                    }
+                    
+                    if (userRole === "teacher" || userRole === "admin") {
+                        initTeacherDashboard();
+                    } else {
+                        initStudentDashboard();
+                    }
+                } catch (error) {
+                    console.error("Rol kontrolü başarısız:", error);
+                    initStudentDashboard();
                 }
-                if (userRole === "teacher" || userRole === "admin") {
-                    initTeacherDashboard();
-                } else {
-                    // Öğrenci paneline devam et
-                    document.getElementById('teacher-panel').classList.add('hidden');
-                    document.getElementById('dashboard').classList.add('active');
-                }
-            } catch (error) {
-                console.error("Rol kontrolü başarısız:", error);
             }
-        }
-        
-        function initTeacherDashboard() {
-            // Tüm öğrenci sekmelerini gizle
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.querySelector('.tab-btn[data-tab="dashboard"]').parentElement.classList.add('hidden'); // Üst menüyü öğretmene gizle
-            
-            // Öğretmen panelini göster
-            const teacherPanel = document.getElementById('teacher-panel');
-            teacherPanel.classList.remove('hidden');
-            teacherPanel.classList.add('block');
-            
-            document.getElementById('teacher-email-display').innerText = `Yetkili Oturum: ${currentUser.email}`;
-            loadAllStudentsForTeacher();
-        }
-        
-        async function loadAllStudentsForTeacher() {
-            // Daha önce verdiğim tüm loadAllStudentsForTeacher, selectStudentForReview, switchTeacherTab ve renderTeacherStudentData fonksiyonları burada olacak...
-            // (Yer kaplamaması için özet geçiyorum, önceki mesajımdaki fonksiyonların tamamını buraya koy)
-        }
-        // --- ÖĞRETMEN PANELİ FONKSİYONLARI SONU ---
+    
+            function initStudentDashboard() {
+                // 1. Öğretmen panelini tamamen gizle
+                const teacherPanel = document.getElementById('teacher-panel');
+                if (teacherPanel) {
+                    teacherPanel.classList.add('hidden');
+                    teacherPanel.classList.remove('block');
+                }
+                
+                // 2. Bütün sekmeleri temizle ve sadece öğrencinin Dashboard'unu aç
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                const dashboardTab = document.getElementById('dashboard');
+                if (dashboardTab) {
+                    dashboardTab.classList.add('active');
+                }
+            }
+    
+            function initTeacherDashboard() {
+                // 1. Öğrenci sekmelerini gizle
+                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+                
+                // 2. Öğretmen panelini göster
+                const teacherPanel = document.getElementById('teacher-panel');
+                if (teacherPanel) {
+                    teacherPanel.classList.remove('hidden');
+                    teacherPanel.classList.add('block');
+                }
+                
+                const emailDisp = document.getElementById('teacher-email-display');
+                if (emailDisp && currentUser) {
+                    emailDisp.innerText = `Yetkili Oturum: ${currentUser.email}`;
+                }
+                
+                loadAllStudentsForTeacher();
+            }
+    
+            let activeStudentId = null;
+            let activeStudentName = '';
+            let activeTeacherTab = 'books';
+    
+            async function loadAllStudentsForTeacher() {
+                const container = document.getElementById('students-list-container');
+                if (!container) return;
+                container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Öğrenciler yükleniyor...</p>';
+    
+                try {
+                    const usersSnapshot = await db.collection("users").where("role", "==", "student").get();
+                    
+                    if (usersSnapshot.empty) {
+                        container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Kayıtlı öğrenci bulunamadı.</p>';
+                        document.getElementById('student-count-badge').innerText = '0 Kayıt';
+                        return;
+                    }
+    
+                    document.getElementById('student-count-badge').innerText = `${usersSnapshot.size} Kayıt`;
+                    let html = '';
+    
+                    usersSnapshot.forEach(docSnap => {
+                        const studentData = docSnap.data();
+                        const studentId = docSnap.id;
+                        const displayName = studentData.displayName || studentData.email || "İsimsiz Öğrenci";
+    
+                        html += `
+                            <div onclick="selectStudentForReview('${studentId}', '${displayName}')" 
+                                 class="p-3 bg-gray-900 hover:bg-indigo-600/20 border border-gray-800 hover:border-indigo-500/50 rounded-xl cursor-pointer transition flex items-center justify-between">
+                                <div>
+                                    <p class="font-bold text-sm text-white">${displayName}</p>
+                                    <p class="text-xs text-gray-400">${studentData.email || ''}</p>
+                                </div>
+                                <span class="text-xs text-indigo-400 font-semibold bg-indigo-950 px-2 py-1 rounded-lg border border-indigo-800">İncele →</span>
+                            </div>
+                        `;
+                    });
+    
+                    container.innerHTML = html;
+                } catch (error) {
+                    console.error("Öğrenciler yüklenirken hata oluştu:", error);
+                    container.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Veriler çekilemedi.</p>';
+                }
+            }
+    
+            function selectStudentForReview(studentId, studentName) {
+                activeStudentId = studentId;
+                activeStudentName = studentName;
+                
+                const header = document.getElementById('selected-student-header');
+                if (header) {
+                    header.innerHTML = `
+                        <h2 class="text-lg font-bold text-indigo-400">${studentName} profili</h2>
+                        <p class="text-xs text-gray-400">Öğrencinin güncel çalışma verileri.</p>
+                    `;
+                }
+    
+                renderTeacherStudentData();
+            }
+    
+            function switchTeacherTab(tab) {
+                activeTeacherTab = tab;
+                const btnBooks = document.getElementById('tab-btn-books');
+                const btnLogs = document.getElementById('tab-btn-logs');
+                
+                if (tab === 'books') {
+                    if (btnBooks) btnBooks.className = "px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white transition";
+                    if (btnLogs) btnLogs.className = "px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition";
+                } else {
+                    if (btnLogs) btnLogs.className = "px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white transition";
+                    if (btnBooks) btnBooks.className = "px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition";
+                }
+                if (activeStudentId) renderTeacherStudentData();
+            }
+    
+            async function renderTeacherStudentData() {
+                const container = document.getElementById('teacher-student-content');
+                if (!container) return;
+                container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Veriler yükleniyor...</p>';
+    
+                if (activeTeacherTab === 'books') {
+                    try {
+                        const booksSnap = await db.collection("users").doc(activeStudentId).collection("books").get();
+                        if (booksSnap.empty) {
+                            container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Öğrenciye ait kayıtlı kitap bulunamadı.</p>';
+                            return;
+                        }
+                        let html = '<div class="space-y-3">';
+                        booksSnap.forEach(doc => {
+                            const book = doc.data();
+                            html += `
+                                <div class="p-4 bg-gray-900 border border-gray-800 rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p class="font-bold text-white text-sm">${book.name || 'İsimsiz Kitap'}</p>
+                                        <p class="text-xs text-gray-400">${book.publisher || ''}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-indigo-400 font-bold text-sm">%${book.progress || 0} Tamamlandı</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        container.innerHTML = html;
+                    } catch (e) {
+                        container.innerHTML = '<p class="text-red-400 text-sm">Kitap verileri okunamadı.</p>';
+                    }
+                } else {
+                    try {
+                        const logsSnap = await db.collection("users").doc(activeStudentId).collection("logs").get();
+                        if (logsSnap.empty) {
+                            container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Öğrenciye ait çalışma günlüğü bulunamadı.</p>';
+                            return;
+                        }
+                        let html = '<div class="space-y-3">';
+                        logsSnap.forEach(doc => {
+                            const log = doc.data();
+                            html += `
+                                <div class="p-3 bg-gray-900 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
+                                    <div>
+                                        <p class="font-bold text-white">${log.subject || ''} - ${log.topic || ''}</p>
+                                        <p class="text-xs text-gray-400">${log.date || ''}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-green-400 font-bold">${log.questionCount || 0} Soru</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        container.innerHTML = html;
+                    } catch (e) {
+                        container.innerHTML = '<p class="text-red-400 text-sm">Çalışma logları okunamadı.</p>';
+                    }
+                }
+            }
+            // --- ÖĞRETMEN PANELİ VE ROL YÖNETİMİ BİTİŞİ ---
     </script>
 </body>
 </html>
