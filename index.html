@@ -1842,90 +1842,371 @@
             }
         }
 
-        // Öğretmenin Kendi Eklediği Öğrencileri Listelemesi
+        // =========================================================================
+        // ÖĞRETMEN PANELİ VE ÖĞRENCİ DETAY YÖNETİMİ
+        // =========================================================================
+        
         async function loadTeacherStudents() {
             if (!currentUser) return;
-            const container = document.getElementById('teacher-students-list');
-            
+            const listContainer = document.getElementById('teacher-students-list');
+            if (!listContainer) return;
+        
             try {
-                const studentsSnap = await db.collection("teachers").doc(currentUser.uid).collection("students").get();
-                
-                if (studentsSnap.empty) {
-                    container.innerHTML = '<p class="text-gray-500 text-xs text-center py-8">Henüz eklenmiş öğrenci yok.</p>';
+                const userDoc = await db.collection("users").doc(currentUser.uid).get();
+                const data = userDoc.data();
+                const studentEmails = data.students || [];
+        
+                if (studentEmails.length === 0) {
+                    listContainer.innerHTML = '<p class="text-gray-500 text-xs text-center py-8">Henüz eklenmiş öğrenci yok.</p>';
                     return;
                 }
-
+        
                 let html = '';
-                studentsSnap.forEach(doc => {
-                    const student = doc.data();
-                    html += `
-                        <div onclick="selectStudentForReview('${student.studentUid}', '${student.displayName}')" class="p-3 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/50 rounded-xl cursor-pointer transition flex items-center justify-between group">
-                            <div>
-                                <p class="font-bold text-white text-sm group-hover:text-indigo-400 transition">${student.displayName}</p>
-                                <p class="text-xs text-gray-400">${student.email}</p>
-                            </div>
-                            <span class="text-xs bg-indigo-500/10 text-indigo-400 px-2.5 py-1 rounded-lg border border-indigo-500/20">İncele</span>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
-
+                for (let email of studentEmails) {
+                    const querySnapshot = await db.collection("users").where("email", "==", email).get();
+                    if (!querySnapshot.empty) {
+                        querySnapshot.forEach(doc => {
+                            const studentData = doc.data();
+                            const studentId = doc.id;
+                            html += `
+                                <div onclick="selectStudentForTeacher('${studentId}', '${studentData.displayName || email}')" 
+                                     class="p-3 bg-gray-800/40 hover:bg-gray-800 border border-gray-800 rounded-xl cursor-pointer transition flex items-center justify-between group">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold text-sm">
+                                            ${(studentData.displayName || email).charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-white text-sm group-name">${studentData.displayName || 'İsimsiz Öğrenci'}</p>
+                                            <p class="text-xs text-gray-400">${email}</p>
+                                        </div>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-gray-600 group-hover:text-indigo-400 text-xs transition"></i>
+                                </div>
+                            `;
+                        });
+                    }
+                }
+                listContainer.innerHTML = html;
             } catch (e) {
                 console.error("Öğrenciler yüklenemedi:", e);
-                container.innerHTML = '<p class="text-red-400 text-xs text-center py-4">Öğrenci listesi alınamadı.</p>';
+                listContainer.innerHTML = '<p class="text-red-400 text-xs text-center py-4">Öğrenciler yüklenirken hata oluştu.</p>';
             }
         }
-
-        // Seçilen Öğrencinin Verilerini Gizliliği Sağlayarak Güvenli Çekme
-        async function selectStudentForReview(studentUid, studentName) {
+        
+        // Seçilen öğrenciyi global olarak saklamak için değişken
+        let activeTeacherStudentId = null;
+        let activeTeacherStudentName = "";
+        
+        async function selectStudentForTeacher(studentId, studentName) {
+            activeTeacherStudentId = studentId;
+            activeTeacherStudentName = studentName;
+            
+            // Aktif öğrenci kartı seçili stili
+            document.querySelectorAll('#teacher-students-list > div').forEach(el => {
+                el.classList.remove('border-indigo-500', 'bg-gray-800');
+            });
+            event.currentTarget.classList.add('border-indigo-500', 'bg-gray-800');
+        
+            renderTeacherStudentSubTab('overview');
+        }
+        
+        // Öğrenci detay alanında sekmeler arası geçiş (Genel Bakış, Kitaplık, Günlük)
+        function renderTeacherStudentSubTab(subTab) {
+            if (!activeTeacherStudentId) return;
+        
             const detailsContainer = document.getElementById('selected-student-details');
-            detailsContainer.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full py-12">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mb-2"></div>
-                    <p class="text-gray-400 text-sm">${studentName} verileri yükleniyor...</p>
-                </div>
-            `;
-
-            try {
-                // Öğrencinin çalışma günlüklerini (dailyLogs) çekiyoruz
-                const logsSnap = await db.collection("users").doc(studentUid).collection("dailyLogs").get();
-                
-                let html = `
-                    <div class="space-y-4">
-                        <div class="border-b border-gray-800 pb-3 flex justify-between items-center">
+            if (!detailsContainer) return;
+        
+            let subTabsHtml = `
+                <div class="flex flex-col h-full">
+                    <div class="flex items-center justify-between pb-4 mb-4 border-b border-gray-800">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold">
+                                ${activeTeacherStudentName.charAt(0).toUpperCase()}
+                            </div>
                             <div>
-                                <h3 class="text-base font-bold text-white">${studentName} - Çalışma Raporu</h3>
-                                <p class="text-xs text-gray-400">Hesap gizliliği korumalı öğrenci görünümü</p>
+                                <h2 class="text-base font-bold text-white">${activeTeacherStudentName}</h2>
+                                <p class="text-xs text-indigo-400 font-medium">Öğrenci Paneli Takibi</p>
                             </div>
                         </div>
-                        <div class="space-y-2.5">
+                        
+                        <div class="flex bg-gray-800 p-1 rounded-xl text-xs font-semibold gap-1">
+                            <button onclick="renderTeacherStudentSubTab('overview')" class="px-3 py-1.5 rounded-lg transition ${subTab === 'overview' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'}">Genel</button>
+                            <button onclick="renderTeacherStudentSubTab('books')" class="px-3 py-1.5 rounded-lg transition ${subTab === 'books' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'}">Kitaplık</button>
+                            <button onclick="renderTeacherStudentSubTab('daily')" class="px-3 py-1.5 rounded-lg transition ${subTab === 'daily' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'}">Günlük</button>
+                        </div>
+                    </div>
+                    <div id="student-subtab-content" class="flex-1 overflow-y-auto pr-1">
+                        </div>
+                </div>
+            `;
+            detailsContainer.innerHTML = subTabsHtml;
+        
+            if (subTab === 'overview') {
+                loadTeacherStudentOverviewData();
+            } else if (subTab === 'books') {
+                loadTeacherStudentBooksData();
+            } else if (subTab === 'daily') {
+                loadTeacherStudentDailyData();
+            }
+        }
+        
+        // 1. GENEL BAKIŞ VE ÖZET
+        async function loadTeacherStudentOverviewData() {
+            const container = document.getElementById('student-subtab-content');
+            if (!container) return;
+        
+            container.innerHTML = '<p class="text-gray-400 text-xs text-center py-12">Yükleniyor...</p>';
+        
+            try {
+                const studentDoc = await db.collection("users").doc(activeTeacherStudentId).get();
+                const studentData = studentDoc.exists ? studentDoc.data() : {};
+                const streak = studentData.streak || 0;
+        
+                const logsSnap = await db.collection("users").doc(activeTeacherStudentId).collection("logs").orderBy("date", "desc").limit(5).get();
+        
+                let html = `
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-gray-800/40 border border-gray-800 p-4 rounded-xl">
+                                <p class="text-xs text-gray-400">Günlük Seri (Streak)</p>
+                                <p class="text-xl font-bold text-orange-400 mt-1"><i class="fa-solid fa-fire mr-1"></i> ${streak} Gün</p>
+                            </div>
+                            <div class="bg-gray-800/40 border border-gray-800 p-4 rounded-xl">
+                                <p class="text-xs text-gray-400">Toplam Günlük Kaydı</p>
+                                <p class="text-xl font-bold text-indigo-400 mt-1">${logsSnap.size} Kayıt (Son)</p>
+                            </div>
+                        </div>
+        
+                        <div class="bg-gray-800/20 border border-gray-800 p-4 rounded-xl space-y-3">
+                            <h4 class="text-xs font-bold text-gray-300 uppercase tracking-wider">Son Çalışma Aktiviteleri</h4>
                 `;
-
+        
                 if (logsSnap.empty) {
-                    html += '<p class="text-gray-500 text-xs text-center py-12">Bu öğrenciye ait kayıtlı çalışma günlüğü bulunmuyor.</p>';
+                    html += '<p class="text-gray-500 text-xs text-center py-6">Bu öğrenciye ait kayıtlı çalışma günlüğü bulunmuyor.</p>';
                 } else {
                     logsSnap.forEach(doc => {
                         const log = doc.data();
                         html += `
-                            <div class="p-3 bg-gray-800/30 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
+                            <div class="p-3 bg-gray-800/50 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
                                 <div>
-                                    <p class="font-bold text-white text-xs sm:text-sm">${log.subject || 'Ders'} - ${log.topic || 'Konu'}</p>
+                                    <p class="font-bold text-white text-xs">${log.subject || 'Ders'} - ${log.topic || 'Konu'}</p>
                                     <p class="text-[11px] text-gray-400">${log.date || ''}</p>
                                 </div>
                                 <div class="text-right">
-                                    <span class="text-green-400 font-bold text-xs sm:text-sm">${log.questionCount || 0} Soru</span>
+                                    <span class="text-green-400 font-bold text-xs">${log.questionCount || 0} Soru</span>
                                 </div>
                             </div>
                         `;
                     });
                 }
-
                 html += `</div></div>`;
-                detailsContainer.innerHTML = html;
-
+                container.innerHTML = html;
             } catch (e) {
                 console.error("Öğrenci verileri okunamadı:", e);
-                detailsContainer.innerHTML = '<p class="text-red-400 text-sm text-center py-12">Bu öğrencinin verilerine erişim izniniz yok veya bir hata oluştu.</p>';
+                container.innerHTML = '<p class="text-red-400 text-xs text-center py-12">Verilere erişim sağlanamadı.</p>';
+            }
+        }
+        
+        // 2. KİTAPLIK (Ders seçimi ve açılır-kapanır kitap/konu listesi)
+        async function loadTeacherStudentBooksData() {
+            const container = document.getElementById('student-subtab-content');
+            if (!container) return;
+        
+            container.innerHTML = '<p class="text-gray-400 text-xs text-center py-12">Kitaplık yükleniyor...</p>';
+        
+            try {
+                const studentDoc = await db.collection("users").doc(activeTeacherStudentId).get();
+                const studentData = studentDoc.exists ? studentDoc.data() : {};
+                const books = studentData.books || [];
+        
+                if (books.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-xs text-center py-12">Öğrenciye ait kayıtlı kitap/ders bulunmuyor.</p>';
+                    return;
+                }
+        
+                // Benzersiz dersleri bulma
+                const subjects = [...new Set(books.map(b => b.subject))];
+                
+                let html = `
+                    <div class="space-y-4">
+                        <div id="teacher-subject-filters" class="flex gap-2 overflow-x-auto pb-2">
+                            <button onclick="filterTeacherBooks('all', this)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shrink-0 transition">Tümü</button>
+                `;
+                subjects.forEach(sub => {
+                    html += `<button onclick="filterTeacherBooks('${sub}', this)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 hover:bg-gray-700 text-gray-300 shrink-0 transition">${sub}</button>`;
+                });
+                html += `</div><div id="teacher-books-list" class="space-y-3">`;
+        
+                books.forEach((book, bIndex) => {
+                    let totalT = 0, compT = 0;
+                    if (book.topics) {
+                        book.topics.forEach(t => {
+                            totalT += (t.totalTests || 0);
+                            compT += (t.completedTests || 0);
+                        });
+                    }
+                    let percent = totalT > 0 ? Math.round((compT / totalT) * 100) : 0;
+        
+                    html += `
+                        <div class="book-item bg-gray-800/40 border border-gray-800 rounded-xl p-4 space-y-3" data-subject="${book.subject}">
+                            <div class="flex justify-between items-center cursor-pointer" onclick="toggleTeacherBookCollapse(${bIndex})">
+                                <div>
+                                    <span class="text-[10px] bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded-md font-semibold">${book.subject}</span>
+                                    <h4 class="font-bold text-white text-sm mt-1">${book.name}</h4>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs font-bold text-gray-400">${percent}%</span>
+                                    <i id="book-icon-${bIndex}" class="fa-solid fa-chevron-down text-xs text-gray-500 transition"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="progress-bar-bg"><div class="bg-indigo-500 h-full rounded-full transition-all" style="width: ${percent}%"></div></div>
+        
+                            <div id="book-topics-${bIndex}" class="collapsible-content space-y-2 pt-2 border-t border-gray-800/60">
+                    `;
+        
+                    if (book.topics && book.topics.length > 0) {
+                        book.topics.forEach(topic => {
+                            let tPercent = topic.totalTests > 0 ? Math.round((topic.completedTests / topic.totalTests) * 100) : 0;
+                            html += `
+                                <div class="p-2.5 bg-gray-900/60 rounded-lg flex justify-between items-center text-xs">
+                                    <span class="text-gray-300 font-medium">${topic.name}</span>
+                                    <span class="text-indigo-400 font-bold">${topic.completedTests || 0} / ${topic.totalTests || 0} Test (${tPercent}%)</span>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        html += `<p class="text-gray-500 text-xs text-center py-2">Bu kitaba ait konu eklenmemiş.</p>`;
+                    }
+        
+                    html += `</div></div>`;
+                });
+        
+                html += `</div></div>`;
+                container.innerHTML = html;
+        
+            } catch (e) {
+                console.error("Kitaplık yüklenemedi:", e);
+                container.innerHTML = '<p class="text-red-400 text-xs text-center py-12">Kitaplık verileri okunamadı.</p>';
+            }
+        }
+        
+        // Kitap açılır-kapanır akordiyon tetikleyicisi
+        function toggleTeacherBookCollapse(index) {
+            const content = document.getElementById(`book-topics-${index}`);
+            const icon = document.getElementById(`book-icon-${index}`);
+            if (content) {
+                content.classList.toggle('open');
+                if (content.classList.contains('open')) {
+                    icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+                } else {
+                    icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+                }
+            }
+        }
+        
+        // Kitaplık ders filtreleme
+        function filterTeacherBooks(subject, btn) {
+            document.querySelectorAll('#teacher-subject-filters button').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white');
+                b.classList.add('bg-gray-800', 'text-gray-300');
+            });
+            btn.classList.remove('bg-gray-800', 'text-gray-300');
+            btn.classList.add('bg-indigo-600', 'text-white');
+        
+            document.querySelectorAll('.book-item').forEach(item => {
+                if (subject === 'all' || item.getAttribute('data-subject') === subject) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+        
+        // 3. GÜNLÜK (Haftalar -> Günler -> Dersler şeklinde açılır kapanır yapı)
+        async function loadTeacherStudentDailyData() {
+            const container = document.getElementById('student-subtab-content');
+            if (!container) return;
+        
+            container.innerHTML = '<p class="text-gray-400 text-xs text-center py-12">Günlük kayıtları yükleniyor...</p>';
+        
+            try {
+                const logsSnap = await db.collection("users").doc(activeTeacherStudentId).collection("logs").orderBy("date", "desc").get();
+        
+                if (logsSnap.empty) {
+                    container.innerHTML = '<p class="text-gray-500 text-xs text-center py-12">Öğrenciye ait kayıtlı günlük çalışma oturumu bulunmuyor.</p>';
+                    return;
+                }
+        
+                // Logları tarihe göre gruplama
+                let logsByDate = {};
+                logsSnap.forEach(doc => {
+                    const log = doc.data();
+                    const date = log.date || 'Tarihsiz';
+                    if (!logsByDate[date]) logsByDate[date] = [];
+                    logsByDate[date].push(log);
+                });
+        
+                let html = `<div class="space-y-3">`;
+                let dIndex = 0;
+        
+                for (let date in logsByDate) {
+                    let dayLogs = logsByDate[date];
+                    let totalQInDay = dayLogs.reduce((sum, l) => sum + (parseInt(l.questionCount) || 0), 0);
+        
+                    html += `
+                        <div class="bg-gray-800/40 border border-gray-800 rounded-xl p-3.5 space-y-2">
+                            <div class="flex justify-between items-center cursor-pointer" onclick="toggleTeacherDayCollapse(${dIndex})">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-calendar-day text-indigo-400 text-xs"></i>
+                                    <span class="font-bold text-white text-xs sm:text-sm">${date}</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-green-400 font-bold text-xs">${totalQInDay} Soru</span>
+                                    <i id="day-icon-${dIndex}" class="fa-solid fa-chevron-down text-xs text-gray-500 transition"></i>
+                                </div>
+                            </div>
+        
+                            <div id="day-logs-${dIndex}" class="collapsible-content space-y-2 pt-2 border-t border-gray-800/60">
+                    `;
+        
+                    dayLogs.forEach(log => {
+                        html += `
+                            <div class="p-2.5 bg-gray-900/60 rounded-lg flex justify-between items-center text-xs">
+                                <div>
+                                    <span class="font-bold text-white">${log.subject || 'Ders'} - ${log.topic || 'Konu'}</span>
+                                    <p class="text-[11px] text-gray-400">Doğru: ${log.correctCount || 0} | Yanlış: ${log.wrongCount || 0}</p>
+                                </div>
+                                <span class="text-indigo-400 font-bold">${log.questionCount || 0} Soru</span>
+                            </div>
+                        `;
+                    });
+        
+                    html += `</div></div>`;
+                    dIndex++;
+                }
+        
+                html += `</div>`;
+                container.innerHTML = html;
+        
+            } catch (e) {
+                console.error("Günlük loglar okunamadı:", e);
+                container.innerHTML = '<p class="text-red-400 text-xs text-center py-12">Günlük verileri okunamadı.</p>';
+            }
+        }
+        
+        // Günlük akordiyon tetikleyicisi
+        function toggleTeacherDayCollapse(index) {
+            const content = document.getElementById(`day-logs-${index}`);
+            const icon = document.getElementById(`day-icon-${index}`);
+            if (content) {
+                content.classList.toggle('open');
+                if (content.classList.contains('open')) {
+                    icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+                } else {
+                    icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+                }
             }
         }
         // =========================================================================
