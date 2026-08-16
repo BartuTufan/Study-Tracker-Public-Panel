@@ -87,7 +87,7 @@
     <main class="max-w-6xl mx-auto px-4 py-6 sm:py-8">
         <main class="max-w-6xl mx-auto px-4 py-6 sm:py-8">
         
-            <div id="teacher-panel" class="hidden p-6 max-w-7xl mx-auto space-y-6">
+            <div id="teacher-panel" class="hidden p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
     
                 <div class="flex justify-between items-center bg-gray-900 p-4 rounded-2xl border border-gray-800">
                     <div>
@@ -1942,35 +1942,35 @@
                 detailsContainer.innerHTML = '<p class="text-red-400 text-sm text-center py-12">Bu öğrencinin verilerine erişim izniniz yok veya bir hata oluştu.</p>';
             }
         }
-        // =========================================================================
         let selectedStudentData = null;
         let activeStudentId = null;
         
-        // Öğrenci listesine tıklandığında çalışacak fonksiyon
+        // 1. Öğrenciye tıklandığında verileri çeken ana fonksiyon
         async function selectStudentForInspection(studentId, studentName, studentEmail) {
             activeStudentId = studentId;
             
-            // UI güncellemesi: Header başlığını değiştir
-            document.getElementById('selected-student-header').innerHTML = `
-                <h2 class="text-lg font-bold text-white">👤 ${studentName}</h2>
-                <p class="text-xs text-gray-400">${studentEmail}</p>
-            `;
+            // Sağ üst başlığı güncelle
+            const headerEl = document.getElementById('selected-student-header');
+            if(headerEl) {
+                headerEl.innerHTML = `
+                    <h2 class="text-lg font-bold text-white">👤 ${studentName}</h2>
+                    <p class="text-xs text-gray-400">${studentEmail}</p>
+                `;
+            }
             
-            document.getElementById('student-detail-content').classList.remove('hidden');
+            const detailContent = document.getElementById('student-detail-content');
+            if(detailContent) detailContent.classList.remove('hidden');
             
-            // Öğrencinin verilerini Firebase'den çekelim
             try {
-                const studentDocRef = db.collection("users").doc(studentId);
-                const docSnap = await studentDocRef.get();
+                // Öğrencinin Firestore'daki ana dokümanını ve alt verilerini alıyoruz
+                const docSnap = await db.collection("users").doc(studentId).get();
                 
                 if (docSnap.exists) {
                     selectedStudentData = docSnap.data();
-                    // Varsayılan olarak ilk sekme (Kitaplık) ve ilk ders görünümünü yükle
                     renderStudentLibrarySubjects();
                     renderStudentDailyLogs();
                 } else {
-                    // Eğer özel bir state alanı yoksa boş başlat
-                    selectedStudentData = { books: [], logs: [] };
+                    selectedStudentData = { books: [] };
                     renderStudentLibrarySubjects();
                     renderStudentDailyLogs();
                 }
@@ -1979,7 +1979,7 @@
             }
         }
         
-        // Öğrenci Detay Sekme Değiştirici (Kitaplık <-> Günlük)
+        // 2. Kitaplık / Günlük Sekme Değiştirici
         function switchStudentTab(tabName) {
             const libTab = document.getElementById('st-tab-library');
             const logsTab = document.getElementById('st-tab-logs');
@@ -1987,24 +1987,26 @@
             const logsContent = document.getElementById('st-content-logs');
         
             if (tabName === 'library') {
-                libTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-indigo-600 text-white transition";
-                logsTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-gray-800 text-gray-400 hover:text-white transition";
-                libContent.classList.remove('hidden');
-                logsContent.classList.add('hidden');
+                if(libTab) libTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-indigo-600 text-white transition";
+                if(logsTab) logsTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-gray-800 text-gray-400 hover:text-white transition";
+                if(libContent) libContent.classList.remove('hidden');
+                if(logsContent) logsContent.classList.add('hidden');
             } else {
-                logsTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-indigo-600 text-white transition";
-                libTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-gray-800 text-gray-400 hover:text-white transition";
-                logsContent.classList.remove('hidden');
-                libContent.classList.add('hidden');
+                if(logsTab) logsTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-indigo-600 text-white transition";
+                if(libTab) libTab.className = "px-4 py-2 rounded-xl font-medium text-sm bg-gray-800 text-gray-400 hover:text-white transition";
+                if(logsContent) logsContent.classList.remove('hidden');
+                if(libContent) libContent.classList.add('hidden');
             }
         }
         
-        // 6 Ana Branş Listeleme (Türkçe, Matematik, Sosyal, Fizik, Kimya, Biyoloji)
+        // 3. 6 Ana Ders Alanını Listeleme (Türkçe, Matematik vb.)
         function renderStudentLibrarySubjects() {
             const subjectsGrid = document.getElementById('student-subjects-grid');
-            const subjects = ['Türkçe', 'Matematik', 'Sosyal', 'Fizik', 'Kimya', 'Biyoloji'];
+            if(!subjectsGrid) return;
             
+            const subjects = ['Türkçe', 'Matematik', 'Sosyal', 'Fizik', 'Kimya', 'Biyoloji'];
             let html = '';
+            
             subjects.forEach(subject => {
                 html += `
                     <button onclick="filterStudentBooksBySubject('${subject}')" class="p-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-left transition font-medium text-sm text-white flex items-center justify-between">
@@ -2015,47 +2017,49 @@
             subjectsGrid.innerHTML = html;
         }
         
-        // Seçilen derse ait kitapları ve konuları açılıp-kapanır (akordiyon) şekilde listeleme
+        // 4. Seçilen Derse Ait Kitapları ve Açılır-Kapanır Konuları Listeleme
         function filterStudentBooksBySubject(subjectName) {
             const container = document.getElementById('student-books-container');
+            if(!container) return;
+            
             const books = selectedStudentData?.books?.filter(b => b.subject === subjectName) || [];
         
             if (books.length === 0) {
-                container.innerHTML = `<p class=\"text-gray-500 text-sm text-center py-4\">Bu derse ait eklenmiş kitap bulunmuyor.</p>`;
+                container.innerHTML = `<p class="text-gray-500 text-sm text-center py-4">Bu derse ait eklenmiş kitap bulunmuyor.</p>`;
                 return;
             }
         
-            let html = `<h4 class=\"text-xs font-bold text-gray-400 uppercase tracking-wider mb-2\">${subjectName} Kitapları ve Konuları</h4>`;
+            let html = `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${subjectName} Kitapları</h4>`;
             
             books.forEach((book, index) => {
                 const solved = book.solvedTests || 0;
                 const total = book.totalTests || 100;
-                const percent = Math.round((solved / total) * 100);
+                const percent = total > 0 ? Math.round((solved / total) * 100) : 0;
         
                 html += `
-                    <div class=\"bg-gray-800/60 border border-gray-700 rounded-xl p-4 space-y-3\">
-                        <div class=\"flex justify-between items-center cursor-pointer\" onclick=\"toggleStudentBookAccordion('st-book-${index}')\">
+                    <div class="bg-gray-800/60 border border-gray-700 rounded-xl p-4 space-y-3">
+                        <div class="flex justify-between items-center cursor-pointer" onclick="toggleStudentBookAccordion('st-book-${index}')">
                             <div>
-                                <h5 class=\"font-bold text-white text-sm\">📘 ${book.title}</h5>
-                                <p class=\"text-xs text-gray-400\">Çözülen: ${solved} / ${total} Test (%${percent})</p>
+                                <h5 class="font-bold text-white text-sm">📘 ${book.title || book.name || 'Kitap'}</h5>
+                                <p class="text-xs text-gray-400">Çözülen: ${solved} / ${total} Test (%${percent})</p>
                             </div>
-                            <span class=\"text-xs text-indigo-400 font-semibold\">Konuları Gör ▼</span>
+                            <span class="text-xs text-indigo-400 font-semibold">Konuları Gör ▼</span>
                         </div>
         
-                        <div id=\"st-book-${index}\" class=\"hidden space-y-2 pt-2 border-t border-gray-700/50\">
+                        <div id="st-book-${index}" class="hidden space-y-2 pt-2 border-t border-gray-700/50">
                 `;
         
                 if (book.topics && book.topics.length > 0) {
                     book.topics.forEach(topic => {
                         html += `
-                            <div class=\"flex justify-between items-center text-xs bg-gray-900/50 p-2 rounded-lg\">
-                                <span class=\"text-gray-300\">▪️ ${topic.name}</span>
-                                <span class=\"${topic.completed ? 'text-green-400 font-bold' : 'text-gray-500'}\">${topic.completed ? 'Tamamlandı' : 'Çalışılıyor'}</span>
+                            <div class="flex justify-between items-center text-xs bg-gray-900/50 p-2 rounded-lg">
+                                <span class="text-gray-300">▪️ ${topic.name}</span>
+                                <span class="${topic.completed ? 'text-green-400 font-bold' : 'text-gray-500'}">${topic.completed ? 'Tamamlandı' : 'Çalışılıyor'}</span>
                             </div>
                         `;
                     });
                 } else {
-                    html += `<p class=\"text-xs text-gray-500 italic\">Bu kitaba ait konu eklenmemiş.</p>`;
+                    html += `<p class="text-xs text-gray-500 italic">Bu kitaba ait konu eklenmemiş.</p>`;
                 }
         
                 html += `</div></div>`;
@@ -2064,39 +2068,45 @@
             container.innerHTML = html;
         }
         
-        // Kitap akordiyon açma/kapama fonksiyonu
+        // Kitap Akordiyon Açma/Kapama Komutu
         function toggleStudentBookAccordion(elementId) {
             const el = document.getElementById(elementId);
-            if (el.classList.contains('hidden')) {
-                el.classList.remove('hidden');
-            } else {
-                el.classList.add('hidden');
+            if (el) {
+                if (el.classList.contains('hidden')) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
             }
         }
         
-        // Günlük Çalışma Loglarını Haftalar/Günler şeklinde listeleme
+        // 5. Günlük Çalışma Kayıtlarını (Logs) Listeleme
         async function renderStudentDailyLogs() {
             const container = document.getElementById('student-daily-logs-container');
+            if(!container) return;
             
+            container.innerHTML = `<p class="text-gray-500 text-sm text-center py-6">Günlük kayıtlar yükleniyor...</p>`;
+        
             try {
+                // Öğrencinin alt koleksiyonundan çalışma loglarını çekiyoruz
                 const logsSnap = await db.collection("users").doc(activeStudentId).collection("studyLogs").orderBy("date", "desc").get();
                 
                 if (logsSnap.empty) {
-                    container.innerHTML = `<p class=\"text-gray-500 text-sm text-center py-6\">Öğrenciye ait günlük çalışma kaydı bulunamadı.</p>`;
+                    container.innerHTML = `<p class="text-gray-500 text-sm text-center py-6">Bu öğrenciye ait günlük çalışma kaydı bulunmuyor.</p>`;
                     return;
                 }
         
-                let html = `<div class=\"space-y-3\">`;
+                let html = `<div class="space-y-3">`;
                 logsSnap.forEach(doc => {
                     const log = doc.data();
                     html += `
-                        <div class=\"p-4 bg-gray-800/40 border border-gray-800 rounded-xl flex justify-between items-center text-sm\">
+                        <div class="p-4 bg-gray-800/40 border border-gray-800 rounded-xl flex justify-between items-center text-sm">
                             <div>
-                                <p class=\"font-bold text-white\">📅 ${log.date || 'Tarih belirtilmemiş'}</p>
-                                <p class=\"text-xs text-indigo-400 mt-0.5\">${log.subject || 'Ders'} &bull; <span class=\"text-gray-300\">${log.topic || 'Konu'}</span></p>
+                                <p class="font-bold text-white">📅 ${log.date || 'Tarih belirtilmemiş'}</p>
+                                <p class="text-xs text-indigo-400 mt-0.5">${log.subject || 'Ders'} &bull; <span class="text-gray-300">${log.topic || 'Konu'}</span></p>
                             </div>
-                            <div class=\"text-right\">
-                                <span class=\"text-green-400 font-bold\">${log.questionCount || 0} Soru / Test</span>
+                            <div class="text-right">
+                                <span class="text-green-400 font-bold">${log.questionCount || log.testCount || 0} Soru / Test</span>
                             </div>
                         </div>
                     `;
@@ -2106,7 +2116,7 @@
         
             } catch (e) {
                 console.error("Günlük loglar okunamadı:", e);
-                container.innerHTML = `<p class=\"text-red-400 text-sm text-center py-6\">Günlük kayıtlar yüklenirken bir hata oluştu.</p>`;
+                container.innerHTML = `<p class="text-red-400 text-sm text-center py-6">Günlük kayıtlar yüklenirken bir hata oluştu veya alt koleksiyon bulunamadı.</p>`;
             }
         }
     </script>
