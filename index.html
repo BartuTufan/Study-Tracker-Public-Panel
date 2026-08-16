@@ -1918,13 +1918,22 @@
         }
 
         // =========================================================================
-        // ÖĞRETEN İNCELEME PANELİ: KİTAPLIK VE GÜNLÜK AKORDİYON SİSTEMİ
+        // ÖĞRETEN İNCELEME PANELİ: KİTAPLIK VE GÜNLÜK AKORDİYON SİSTEMİ (GÜNCELLENDİ)
         // =========================================================================
         
         // Global Öğrenci Veri Önbelleği
         let reviewStudentBooksCache = [];
         
-        // 1. Sekme Değiştirme (Kitaplık / Günlük)
+        // Güvenli Metin Çıkarıcı (Obje gelirse isimlerini alır)
+        function getSafeText(val, fallback = '') {
+            if (val === null || val === undefined) return fallback;
+            if (typeof val === 'object') {
+                return val.name || val.title || val.ders || val.konu || val.id || fallback;
+            }
+            return String(val);
+        }
+        
+        // 1. Sekme Değiştirme
         function switchReviewTab(tabName) {
             document.querySelectorAll('.review-tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.review-tab-btn').forEach(btn => {
@@ -1950,7 +1959,7 @@
             if (icon) icon.classList.toggle('rotate-180');
         }
         
-        // 3. Üst Navigasyondan Ders Seçimi ve Filtreleme (Kitaplık)
+        // 3. Üst Navigasyondan Ders Seçimi
         function filterReviewBooksBySubject(subjectName) {
             document.querySelectorAll('.review-subject-btn').forEach(btn => {
                 btn.classList.remove('bg-indigo-600', 'text-white');
@@ -1965,12 +1974,12 @@
         
             const filteredBooks = (subjectName === 'Tümü') 
                 ? reviewStudentBooksCache 
-                : reviewStudentBooksCache.filter(b => (b.subject || b.ders || 'Diğer') === subjectName);
+                : reviewStudentBooksCache.filter(b => getSafeText(b.subject || b.ders, 'Diğer') === subjectName);
         
             renderReviewBooksAccordion(filteredBooks);
         }
         
-        // 4. Kitaplık Akordiyon Oluşturucu (Kitap > Bölüm > Konu)
+        // 4. Kitaplık Akordiyon Oluşturucu
         function renderReviewBooksAccordion(booksList) {
             const container = document.getElementById('review-books-accordion-container');
             if (!container) return;
@@ -1995,7 +2004,7 @@
                 } else if (book.topics && Array.isArray(book.topics) && book.topics.length > 0) {
                     const tempMap = {};
                     book.topics.forEach(top => {
-                        const secName = top.chapter || top.section || top.bölüm || 'Genel Konular';
+                        const secName = getSafeText(top.chapter || top.section || top.bölüm, 'Genel Konular');
                         if (!tempMap[secName]) tempMap[secName] = [];
                         tempMap[secName].push(top);
                     });
@@ -2038,10 +2047,12 @@
                                 chapTot += tot;
                                 const topPercent = tot > 0 ? Math.round((comp / tot) * 100) : 0;
         
+                                const topicName = getSafeText(t.name || t.topicName, 'İsimsiz Konu');
+        
                                 topicsHtml += `
                                     <div class="flex justify-between items-center text-xs p-2 bg-gray-950/80 rounded-lg border border-gray-800/80">
                                         <div class="flex-1 pr-3">
-                                            <span class="font-medium text-gray-300 text-[11px]">${t.name || t.topicName || 'Konu'}</span>
+                                            <span class="font-medium text-gray-300 text-[11px]">${topicName}</span>
                                             <div class="w-full bg-gray-800 h-1 rounded-full overflow-hidden mt-1">
                                                 <div class="bg-indigo-400 h-full rounded-full" style="width: ${topPercent}%"></div>
                                             </div>
@@ -2055,13 +2066,14 @@
                         }
         
                         const chapPercent = chapTot > 0 ? Math.round((chapComp / chapTot) * 100) : 0;
+                        const chapName = getSafeText(chap.name, 'Bölüm');
         
                         chaptersHtml += `
                             <div class="border border-gray-800/80 rounded-lg bg-gray-900/60 overflow-hidden mb-2">
                                 <button onclick="toggleReviewAccordion('${chapId}', '${chapId}-icon')" class="w-full p-2.5 flex justify-between items-center text-left hover:bg-gray-800/60 transition">
                                     <div class="flex items-center gap-2 flex-1 pr-2">
                                         <i class="fa-solid fa-folder-open text-indigo-400 text-xs"></i>
-                                        <span class="font-semibold text-gray-200 text-xs">${chap.name || 'Bölüm'}</span>
+                                        <span class="font-semibold text-gray-200 text-xs">${chapName}</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] text-gray-400 font-mono">%${chapPercent}</span>
@@ -2077,7 +2089,8 @@
                     });
                 }
         
-                const bookSubjectTag = book.subject || book.ders || 'Ders';
+                const bookName = getSafeText(book.name || book.title, 'İsimsiz Kitap');
+                const bookSubjectTag = getSafeText(book.subject || book.ders, 'Ders');
         
                 html += `
                     <div class="border border-gray-800 rounded-xl bg-gray-800/40 overflow-hidden mb-3">
@@ -2085,7 +2098,7 @@
                             <div class="flex-1 pr-3">
                                 <div class="flex justify-between items-center mb-1">
                                     <div class="flex items-center gap-2">
-                                        <span class="font-bold text-white text-xs sm:text-sm">${book.name || book.title || 'İsimsiz Kitap'}</span>
+                                        <span class="font-bold text-white text-xs sm:text-sm">${bookName}</span>
                                         <span class="text-[10px] bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 px-2 py-0.5 rounded-full font-medium">${bookSubjectTag}</span>
                                     </div>
                                     <span class="text-indigo-400 font-semibold text-xs">%${bookPercent}</span>
@@ -2108,58 +2121,65 @@
             container.innerHTML = html;
         }
         
-        // 5. Gelişmiş Tarih Ayrıştırıcı (Her Türlü Veri Tipi İçin)
+        // 5. Gelişmiş Tarih Ayrıştırıcı (Tüm Obje ve Timestamp İhtimallerine Karşı Korumalı)
         function parseLogDate(rawDate) {
             if (!rawDate) return { dateStr: 'Tarihsiz', dateObj: null };
         
-            // Firebase Timestamp Objesi
-            if (typeof rawDate === 'object' && rawDate.seconds !== undefined) {
-                const d = new Date(rawDate.seconds * 1000);
+            let d = null;
+        
+            // Firebase Firestore Native Timestamp
+            if (typeof rawDate.toDate === 'function') {
+                d = rawDate.toDate();
+            } 
+            // Manual Object Timestamp Catch
+            else if (typeof rawDate === 'object' && rawDate.seconds !== undefined) {
+                d = new Date(rawDate.seconds * 1000);
+            } 
+            // Private Field Catch
+            else if (typeof rawDate === 'object' && rawDate._seconds !== undefined) {
+                d = new Date(rawDate._seconds * 1000);
+            } 
+            // Pure JS Date Object
+            else if (rawDate instanceof Date || Object.prototype.toString.call(rawDate) === '[object Date]') {
+                d = rawDate;
+            } 
+            // Unix Time
+            else if (typeof rawDate === 'number') {
+                d = new Date(rawDate);
+            }
+        
+            if (d && !isNaN(d.getTime())) {
                 const day = String(d.getDate()).padStart(2, '0');
                 const month = String(d.getMonth() + 1).padStart(2, '0');
-                const year = d.getFullYear();
-                return { dateStr: `${day}.${month}.${year}`, dateObj: d };
+                return { dateStr: `${day}.${month}.${d.getFullYear()}`, dateObj: d };
             }
         
-            // JS Date Objesi
-            if (rawDate instanceof Date) {
-                if (isNaN(rawDate.getTime())) return { dateStr: 'Tarihsiz', dateObj: null };
-                const day = String(rawDate.getDate()).padStart(2, '0');
-                const month = String(rawDate.getMonth() + 1).padStart(2, '0');
-                const year = rawDate.getFullYear();
-                return { dateStr: `${day}.${month}.${year}`, dateObj: rawDate };
-            }
-        
-            // String Metin
+            // Fallback: Text format
             if (typeof rawDate === 'string') {
                 const str = rawDate.trim();
                 if (!str) return { dateStr: 'Tarihsiz', dateObj: null };
         
-                // ISO format YYYY-MM-DD
                 if (str.includes('-')) {
                     const parts = str.split('T')[0].split('-');
                     if (parts.length === 3) {
-                        const y = parseInt(parts[0]);
-                        const m = parseInt(parts[1]) - 1;
-                        const d = parseInt(parts[2]);
-                        const dt = new Date(y, m, d);
-                        const dayStr = String(d).padStart(2, '0');
-                        const monthStr = String(m + 1).padStart(2, '0');
-                        return { dateStr: `${dayStr}.${monthStr}.${y}`, dateObj: dt };
+                        const dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        if (!isNaN(dt.getTime())) {
+                            const dayStr = String(dt.getDate()).padStart(2, '0');
+                            const monthStr = String(dt.getMonth() + 1).padStart(2, '0');
+                            return { dateStr: `${dayStr}.${monthStr}.${dt.getFullYear()}`, dateObj: dt };
+                        }
                     }
                 }
         
-                // TR format DD.MM.YYYY
                 if (str.includes('.')) {
                     const parts = str.split('.');
-                    if (parts.length === 3) {
-                        const d = parseInt(parts[0]);
-                        const m = parseInt(parts[1]) - 1;
-                        const y = parseInt(parts[2]);
-                        const dt = new Date(y, m, d);
-                        const dayStr = String(d).padStart(2, '0');
-                        const monthStr = String(m + 1).padStart(2, '0');
-                        return { dateStr: `${dayStr}.${monthStr}.${y}`, dateObj: dt };
+                    if (parts.length >= 3) {
+                        const dt = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                        if (!isNaN(dt.getTime())) {
+                            const dayStr = String(dt.getDate()).padStart(2, '0');
+                            const monthStr = String(dt.getMonth() + 1).padStart(2, '0');
+                            return { dateStr: `${dayStr}.${monthStr}.${dt.getFullYear()}`, dateObj: dt };
+                        }
                     }
                 }
         
@@ -2173,16 +2193,15 @@
                 return { dateStr: str, dateObj: null };
             }
         
+            // Everything else (unrecognized objects etc.)
             return { dateStr: 'Tarihsiz', dateObj: null };
         }
         
-        // 6. Hafta Bilgisi Başlığı (Pazartesi - Pazar)
+        // 6. Hafta Bilgisi
         function getWeekRangeInfo(dateObj, fallbackStr) {
             if (!dateObj || isNaN(dateObj.getTime())) {
-                return {
-                    weekKey: fallbackStr || 'Tarihsiz',
-                    weekTitle: (fallbackStr && fallbackStr !== 'Tarihsiz') ? fallbackStr : 'Tarihsiz Kayıtlar'
-                };
+                const title = (typeof fallbackStr === 'string' && fallbackStr !== 'Tarihsiz') ? fallbackStr : 'Tarihsiz Kayıtlar';
+                return { weekKey: title, weekTitle: title };
             }
         
             const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
@@ -2203,15 +2222,17 @@
             return { weekKey, weekTitle };
         }
         
-        // 7. Gün Başlığı Metni (Örn: 16 Ağustos 2026, Pazar)
+        // 7. Gün Başlığı
         function getFormattedDayTitle(dateObj, fallbackStr) {
-            if (!dateObj || isNaN(dateObj.getTime())) return fallbackStr || 'Tarihsiz Gün';
+            if (!dateObj || isNaN(dateObj.getTime())) {
+                return (typeof fallbackStr === 'string') ? fallbackStr : 'Tarihsiz Gün';
+            }
             const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
             const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
             return `${dateObj.getDate()} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}, ${dayNames[dateObj.getDay()]}`;
         }
         
-        // 8. Günlük Çalışma Akordiyon Oluşturucu (Haftalık > Günlük > Ders)
+        // 8. Günlük Çalışma Akordiyon
         function renderReviewLogsAccordion(logsList) {
             const container = document.getElementById('review-logs-accordion-container');
             if (!container) return;
@@ -2233,7 +2254,7 @@
                 return 0;
             });
         
-            // B. Verileri Hafta ve Günlere Göre Gruplama
+            // B. Gruplama
             const weeksGroup = {};
         
             logsList.forEach(log => {
@@ -2243,17 +2264,11 @@
                 const dayTitle = getFormattedDayTitle(dateObj, dateStr);
         
                 if (!weeksGroup[weekKey]) {
-                    weeksGroup[weekKey] = {
-                        title: weekTitle,
-                        days: {}
-                    };
+                    weeksGroup[weekKey] = { title: weekTitle, days: {} };
                 }
         
                 if (!weeksGroup[weekKey].days[dateStr]) {
-                    weeksGroup[weekKey].days[dateStr] = {
-                        title: dayTitle,
-                        logs: []
-                    };
+                    weeksGroup[weekKey].days[dateStr] = { title: dayTitle, logs: [] };
                 }
         
                 weeksGroup[weekKey].days[dateStr].logs.push(log);
@@ -2262,7 +2277,7 @@
             let html = '';
             let weekIdx = 0;
         
-            // C. HAFTALIK AKORDİYON (1. KADEME)
+            // C. Haftalık Render
             for (const [weekKey, weekData] of Object.entries(weeksGroup)) {
                 weekIdx++;
                 const weekId = `rev-log-week-${weekIdx}`;
@@ -2271,29 +2286,28 @@
                 let daysHtml = '';
                 let dayIdx = 0;
         
-                // D. GÜNLÜK AKORDİYON (2. KADEME)
+                // D. Günlük Render
                 for (const [dateStr, dayData] of Object.entries(weekData.days)) {
                     dayIdx++;
                     const dayId = `${weekId}-day-${dayIdx}`;
         
                     const dayTotalQuestions = dayData.logs.reduce((sum, item) => {
-                        const q = Number(item.questionCount || item.questionsSolved || item.soruSayisi || item.count || item.questions || item.soru || 0);
-                        return sum + q;
+                        return sum + Number(item.questionCount || item.questionsSolved || item.soruSayisi || item.count || item.questions || item.soru || 0);
                     }, 0);
         
                     weekTotalQuestions += dayTotalQuestions;
         
-                    // E. DERS / OTURUM DETAYLARI (3. KADEME)
+                    // E. Oturum Render
                     let sessionsHtml = '';
                     dayData.logs.forEach(log => {
-                        const subj = log.subject || log.ders || log.title || log.subjectName || log.dersAdi || 'Ders';
-                        const topic = log.topic || log.konu || log.topicName || log.konuAdi || '';
+                        // Objeden string'e güvenli çıkarım:
+                        const subj = getSafeText(log.subject || log.ders || log.title || log.subjectName || log.dersAdi, 'Ders');
+                        const topic = getSafeText(log.topic || log.konu || log.topicName || log.konuAdi, '');
+                        const note = getSafeText(log.note || log.not || log.aciklama || log.description, '');
+                        
                         const qCount = Number(log.questionCount || log.questionsSolved || log.soruSayisi || log.count || log.questions || log.soru || 0);
-                        
-                        const correctVal = log.correct !== undefined && log.correct !== null ? log.correct : (log.dogru !== undefined ? log.dogru : null);
-                        const wrongVal = log.wrong !== undefined && log.wrong !== null ? log.wrong : (log.yanlis !== undefined ? log.yanlis : null);
-                        
-                        const note = log.note || log.not || log.aciklama || log.description || '';
+                        const correctVal = log.correct !== undefined && log.correct !== null ? Number(log.correct) : (log.dogru !== undefined && log.dogru !== null ? Number(log.dogru) : null);
+                        const wrongVal = log.wrong !== undefined && log.wrong !== null ? Number(log.wrong) : (log.yanlis !== undefined && log.yanlis !== null ? Number(log.yanlis) : null);
         
                         let statsBadge = '';
                         if (correctVal !== null && wrongVal !== null) {
@@ -2368,7 +2382,7 @@
             container.innerHTML = html;
         }
         
-        // 9. Öğrenci İnceleme Ana Fonksiyonu
+        // 9. Ana Fonksiyon
         async function selectStudentForReview(studentUid, studentEmail, studentName) {
             const detailsContainer = document.getElementById('selected-student-details');
             if (!detailsContainer) return;
@@ -2384,7 +2398,6 @@
                 const userDocSnap = await db.collection("users").doc(studentUid).get();
                 const userData = userDocSnap.exists ? userDocSnap.data() : {};
         
-                // 1. Kitapları Çek
                 let booksList = [];
                 const booksSnap = await db.collection("users").doc(studentUid).collection("books").get().catch(() => null);
                 if (booksSnap && !booksSnap.empty) {
@@ -2395,10 +2408,9 @@
         
                 reviewStudentBooksCache = booksList;
         
-                // Ders Navigasyonu Butonları
                 const subjectsSet = new Set();
                 booksList.forEach(b => {
-                    const subj = b.subject || b.ders;
+                    const subj = getSafeText(b.subject || b.ders);
                     if (subj) subjectsSet.add(subj);
                 });
                 const subjectsList = Array.from(subjectsSet);
@@ -2410,7 +2422,7 @@
                 `;
         
                 subjectsList.forEach(subj => {
-                    const count = booksList.filter(b => (b.subject || b.ders) === subj).length;
+                    const count = booksList.filter(b => getSafeText(b.subject || b.ders) === subj).length;
                     const btnId = `review-subj-btn-${subj.replace(/\s+/g, '-')}`;
                     subjectNavHtml += `
                         <button id="${btnId}" onclick="filterReviewBooksBySubject('${subj}')" class="review-subject-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white whitespace-nowrap transition">
@@ -2419,7 +2431,6 @@
                     `;
                 });
         
-                // 2. Günlük Çalışmaları Çek (Tüm İhtimaller)
                 let logsList = [];
                 const logsSnap = await db.collection("users").doc(studentUid).collection("studyLogs").get().catch(() => null);
                 if (logsSnap && !logsSnap.empty) {
@@ -2432,16 +2443,15 @@
                     logsList = userData.logs;
                 }
         
-                // 3. Panel Arayüz Şablonu
                 detailsContainer.innerHTML = `
                     <div class="flex flex-col h-full space-y-3">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-800 pb-3 gap-2">
                             <div>
                                 <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                                     <i class="fa-solid fa-user-graduate text-indigo-400"></i>
-                                    ${studentName || 'İsimsiz Öğrenci'}
+                                    ${getSafeText(studentName, 'İsimsiz Öğrenci')}
                                 </h2>
-                                <p class="text-xs text-gray-400">${studentEmail || ''}</p>
+                                <p class="text-xs text-gray-400">${getSafeText(studentEmail, '')}</p>
                             </div>
                             
                             <div class="flex gap-1 bg-gray-950 p-1 rounded-xl border border-gray-800 w-full sm:w-auto">
