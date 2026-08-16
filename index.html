@@ -1918,13 +1918,13 @@
         }
 
         // =========================================================================
-        // ÖĞRETEN İNCELEME PANELİ: KİTAPLIK VE GÜNLÜK AKORDİYON SİSTEMİ (GÜNCELLENDİ)
+        // ÖĞRETEN İNCELEME PANELİ: KİTAPLIK VE GÜNLÜK AKORDİYON SİSTEMİ (4 KADEMELİ)
         // =========================================================================
         
         // Global Öğrenci Veri Önbelleği
         let reviewStudentBooksCache = [];
         
-        // Güvenli Metin Çıkarıcı (Obje gelirse isimlerini alır)
+        // Güvenli Metin Çıkarıcı
         function getSafeText(val, fallback = '') {
             if (val === null || val === undefined) return fallback;
             if (typeof val === 'object') {
@@ -2121,32 +2121,16 @@
             container.innerHTML = html;
         }
         
-        // 5. Gelişmiş Tarih Ayrıştırıcı (Tüm Obje ve Timestamp İhtimallerine Karşı Korumalı)
+        // 5. Tarih ve Hafta İşlemleri
         function parseLogDate(rawDate) {
             if (!rawDate) return { dateStr: 'Tarihsiz', dateObj: null };
         
             let d = null;
-        
-            // Firebase Firestore Native Timestamp
-            if (typeof rawDate.toDate === 'function') {
-                d = rawDate.toDate();
-            } 
-            // Manual Object Timestamp Catch
-            else if (typeof rawDate === 'object' && rawDate.seconds !== undefined) {
-                d = new Date(rawDate.seconds * 1000);
-            } 
-            // Private Field Catch
-            else if (typeof rawDate === 'object' && rawDate._seconds !== undefined) {
-                d = new Date(rawDate._seconds * 1000);
-            } 
-            // Pure JS Date Object
-            else if (rawDate instanceof Date || Object.prototype.toString.call(rawDate) === '[object Date]') {
-                d = rawDate;
-            } 
-            // Unix Time
-            else if (typeof rawDate === 'number') {
-                d = new Date(rawDate);
-            }
+            if (typeof rawDate.toDate === 'function') d = rawDate.toDate();
+            else if (typeof rawDate === 'object' && rawDate.seconds !== undefined) d = new Date(rawDate.seconds * 1000);
+            else if (typeof rawDate === 'object' && rawDate._seconds !== undefined) d = new Date(rawDate._seconds * 1000);
+            else if (rawDate instanceof Date) d = rawDate;
+            else if (typeof rawDate === 'number') d = new Date(rawDate);
         
             if (d && !isNaN(d.getTime())) {
                 const day = String(d.getDate()).padStart(2, '0');
@@ -2154,7 +2138,6 @@
                 return { dateStr: `${day}.${month}.${d.getFullYear()}`, dateObj: d };
             }
         
-            // Fallback: Text format
             if (typeof rawDate === 'string') {
                 const str = rawDate.trim();
                 if (!str) return { dateStr: 'Tarihsiz', dateObj: null };
@@ -2163,11 +2146,7 @@
                     const parts = str.split('T')[0].split('-');
                     if (parts.length === 3) {
                         const dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                        if (!isNaN(dt.getTime())) {
-                            const dayStr = String(dt.getDate()).padStart(2, '0');
-                            const monthStr = String(dt.getMonth() + 1).padStart(2, '0');
-                            return { dateStr: `${dayStr}.${monthStr}.${dt.getFullYear()}`, dateObj: dt };
-                        }
+                        if (!isNaN(dt.getTime())) return { dateStr: `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')}.${dt.getFullYear()}`, dateObj: dt };
                     }
                 }
         
@@ -2175,64 +2154,54 @@
                     const parts = str.split('.');
                     if (parts.length >= 3) {
                         const dt = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                        if (!isNaN(dt.getTime())) {
-                            const dayStr = String(dt.getDate()).padStart(2, '0');
-                            const monthStr = String(dt.getMonth() + 1).padStart(2, '0');
-                            return { dateStr: `${dayStr}.${monthStr}.${dt.getFullYear()}`, dateObj: dt };
-                        }
+                        if (!isNaN(dt.getTime())) return { dateStr: `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')}.${dt.getFullYear()}`, dateObj: dt };
                     }
                 }
-        
-                const dt = new Date(str);
-                if (!isNaN(dt.getTime())) {
-                    const dayStr = String(dt.getDate()).padStart(2, '0');
-                    const monthStr = String(dt.getMonth() + 1).padStart(2, '0');
-                    return { dateStr: `${dayStr}.${monthStr}.${dt.getFullYear()}`, dateObj: dt };
-                }
-        
-                return { dateStr: str, dateObj: null };
             }
-        
-            // Everything else (unrecognized objects etc.)
             return { dateStr: 'Tarihsiz', dateObj: null };
         }
         
-        // 6. Hafta Bilgisi
         function getWeekRangeInfo(dateObj, fallbackStr) {
-            if (!dateObj || isNaN(dateObj.getTime())) {
-                const title = (typeof fallbackStr === 'string' && fallbackStr !== 'Tarihsiz') ? fallbackStr : 'Tarihsiz Kayıtlar';
-                return { weekKey: title, weekTitle: title };
-            }
-        
+            if (!dateObj || isNaN(dateObj.getTime())) return { weekKey: fallbackStr || 'Tarihsiz', weekTitle: fallbackStr || 'Tarihsiz Kayıtlar' };
             const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
             const day = d.getDay();
             const diffToMonday = (day === 0 ? -6 : 1 - day);
-            
             const monday = new Date(d);
             monday.setDate(d.getDate() + diffToMonday);
-            
             const sunday = new Date(monday);
             sunday.setDate(monday.getDate() + 6);
-        
             const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-            
             const weekKey = `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
             const weekTitle = `${monday.getDate()} ${monthNames[monday.getMonth()]} - ${sunday.getDate()} ${monthNames[sunday.getMonth()]} ${sunday.getFullYear()}`;
-        
             return { weekKey, weekTitle };
         }
         
-        // 7. Gün Başlığı
         function getFormattedDayTitle(dateObj, fallbackStr) {
-            if (!dateObj || isNaN(dateObj.getTime())) {
-                return (typeof fallbackStr === 'string') ? fallbackStr : 'Tarihsiz Gün';
-            }
+            if (!dateObj || isNaN(dateObj.getTime())) return fallbackStr || 'Tarihsiz Gün';
             const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
             const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
             return `${dateObj.getDate()} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}, ${dayNames[dateObj.getDay()]}`;
         }
         
-        // 8. Günlük Çalışma Akordiyon
+        // Badgeları oluşturan yardımcı fonksiyon (Hafta, Gün, Ders veya Konu başlıkları için)
+        function generateStatsBadges(stats, isLarge = false) {
+            let html = '';
+            const textSize = isLarge ? 'text-xs' : 'text-[10px]';
+            const px = isLarge ? 'px-2 py-0.5' : 'px-1.5 py-0.5';
+        
+            if (stats.tests > 0) {
+                html += `<span class="${textSize} font-bold text-indigo-400 bg-indigo-950/40 ${px} rounded border border-indigo-800/50 font-mono">${stats.tests} Test</span>`;
+            }
+            if (stats.questions > 0) {
+                html += `<span class="${textSize} font-bold text-green-400 bg-green-950/40 ${px} rounded border border-green-800/50 font-mono">${stats.questions} Soru</span>`;
+            }
+            if (stats.hasDY) {
+                html += `<span class="${textSize} text-gray-300 bg-gray-900 border border-gray-700 ${px} rounded font-mono whitespace-nowrap"><span class="text-green-400 font-bold">${stats.correct}D</span> / <span class="text-red-400 font-bold">${stats.wrong}Y</span></span>`;
+            }
+            return html;
+        }
+        
+        // 6. GÜNLÜK ÇALIŞMA AKORDİYON SİSTEMİ (4 KADEME)
         function renderReviewLogsAccordion(logsList) {
             const container = document.getElementById('review-logs-accordion-container');
             if (!container) return;
@@ -2244,115 +2213,150 @@
         
             // A. Tarihe Göre Yeniden Eskiye Sırala
             logsList.sort((a, b) => {
-                const rawA = a.date || a.tarih || a.createdAt || a.timestamp || a.time;
-                const rawB = b.date || b.tarih || b.createdAt || b.timestamp || b.time;
-                const da = parseLogDate(rawA).dateObj;
-                const db = parseLogDate(rawB).dateObj;
+                const da = parseLogDate(a.date || a.tarih || a.createdAt || a.timestamp || a.time).dateObj;
+                const db = parseLogDate(b.date || b.tarih || b.createdAt || b.timestamp || b.time).dateObj;
                 if (da && db) return db - da;
                 if (da) return -1;
                 if (db) return 1;
                 return 0;
             });
         
-            // B. Gruplama
-            const weeksGroup = {};
+            // B. Katmanlı Gruplama (Hafta > Gün > Ders > Oturum/Konu)
+            const groupedData = {};
         
             logsList.forEach(log => {
-                const rawDate = log.date || log.tarih || log.createdAt || log.timestamp || log.time;
-                const { dateStr, dateObj } = parseLogDate(rawDate);
+                const { dateStr, dateObj } = parseLogDate(log.date || log.tarih || log.createdAt || log.timestamp || log.time);
                 const { weekKey, weekTitle } = getWeekRangeInfo(dateObj, dateStr);
                 const dayTitle = getFormattedDayTitle(dateObj, dateStr);
+                const subj = getSafeText(log.subject || log.ders || log.title || log.subjectName || log.dersAdi, 'Genel / Belirtilmemiş');
         
-                if (!weeksGroup[weekKey]) {
-                    weeksGroup[weekKey] = { title: weekTitle, days: {} };
+                // Boş katmanları tanımla (Stat yapılarıyla birlikte)
+                if (!groupedData[weekKey]) {
+                    groupedData[weekKey] = { title: weekTitle, days: {}, stats: { tests: 0, questions: 0, correct: 0, wrong: 0, hasDY: false } };
+                }
+                if (!groupedData[weekKey].days[dateStr]) {
+                    groupedData[weekKey].days[dateStr] = { title: dayTitle, subjects: {}, stats: { tests: 0, questions: 0, correct: 0, wrong: 0, hasDY: false } };
+                }
+                if (!groupedData[weekKey].days[dateStr].subjects[subj]) {
+                    groupedData[weekKey].days[dateStr].subjects[subj] = { logs: [], stats: { tests: 0, questions: 0, correct: 0, wrong: 0, hasDY: false } };
                 }
         
-                if (!weeksGroup[weekKey].days[dateStr]) {
-                    weeksGroup[weekKey].days[dateStr] = { title: dayTitle, logs: [] };
-                }
+                // Verileri Çıkart
+                const tCount = Number(log.testCount || log.test || log.tests || 0);
+                const qCount = Number(log.questionCount || log.questionsSolved || log.soruSayisi || log.count || log.questions || log.soru || 0);
+                const cCount = log.correct !== undefined && log.correct !== null ? Number(log.correct) : (log.dogru !== undefined && log.dogru !== null ? Number(log.dogru) : null);
+                const wCount = log.wrong !== undefined && log.wrong !== null ? Number(log.wrong) : (log.yanlis !== undefined && log.yanlis !== null ? Number(log.yanlis) : null);
+                const hasDY = (cCount !== null && wCount !== null);
         
-                weeksGroup[weekKey].days[dateStr].logs.push(log);
+                // Her Üst Kademeye İstatistikleri Ekle (Haftalık, Günlük, Derslik Toplamlar)
+                const levels = [
+                    groupedData[weekKey].stats,
+                    groupedData[weekKey].days[dateStr].stats,
+                    groupedData[weekKey].days[dateStr].subjects[subj].stats
+                ];
+                levels.forEach(lvl => {
+                    lvl.tests += tCount;
+                    lvl.questions += qCount;
+                    if (hasDY) {
+                        lvl.correct += cCount;
+                        lvl.wrong += wCount;
+                        lvl.hasDY = true;
+                    }
+                });
+        
+                // En alt katmana veriyi pushla
+                groupedData[weekKey].days[dateStr].subjects[subj].logs.push({
+                    topic: getSafeText(log.topic || log.konu || log.topicName || log.konuAdi, 'Konu Belirtilmemiş'),
+                    note: getSafeText(log.note || log.not || log.aciklama || log.description, ''),
+                    t: tCount, q: qCount, c: cCount, w: wCount, hasDY: hasDY
+                });
             });
         
             let html = '';
-            let weekIdx = 0;
+            let wIdx = 0, dIdx = 0, sIdx = 0;
         
-            // C. Haftalık Render
-            for (const [weekKey, weekData] of Object.entries(weeksGroup)) {
-                weekIdx++;
-                const weekId = `rev-log-week-${weekIdx}`;
-        
-                let weekTotalQuestions = 0;
+            // C. HMTL Render Döngüleri
+            for (const [weekKey, weekData] of Object.entries(groupedData)) {
+                wIdx++;
+                const weekId = `rev-w-${wIdx}`;
+                
                 let daysHtml = '';
-                let dayIdx = 0;
-        
-                // D. Günlük Render
                 for (const [dateStr, dayData] of Object.entries(weekData.days)) {
-                    dayIdx++;
-                    const dayId = `${weekId}-day-${dayIdx}`;
+                    dIdx++;
+                    const dayId = `${weekId}-d-${dIdx}`;
         
-                    const dayTotalQuestions = dayData.logs.reduce((sum, item) => {
-                        return sum + Number(item.questionCount || item.questionsSolved || item.soruSayisi || item.count || item.questions || item.soru || 0);
-                    }, 0);
+                    let subjectsHtml = '';
+                    for (const [subjName, subjData] of Object.entries(dayData.subjects)) {
+                        sIdx++;
+                        const subjId = `${dayId}-s-${sIdx}`;
         
-                    weekTotalQuestions += dayTotalQuestions;
-        
-                    // E. Oturum Render
-                    let sessionsHtml = '';
-                    dayData.logs.forEach(log => {
-                        // Objeden string'e güvenli çıkarım:
-                        const subj = getSafeText(log.subject || log.ders || log.title || log.subjectName || log.dersAdi, 'Ders');
-                        const topic = getSafeText(log.topic || log.konu || log.topicName || log.konuAdi, '');
-                        const note = getSafeText(log.note || log.not || log.aciklama || log.description, '');
-                        
-                        const qCount = Number(log.questionCount || log.questionsSolved || log.soruSayisi || log.count || log.questions || log.soru || 0);
-                        const correctVal = log.correct !== undefined && log.correct !== null ? Number(log.correct) : (log.dogru !== undefined && log.dogru !== null ? Number(log.dogru) : null);
-                        const wrongVal = log.wrong !== undefined && log.wrong !== null ? Number(log.wrong) : (log.yanlis !== undefined && log.yanlis !== null ? Number(log.yanlis) : null);
-        
-                        let statsBadge = '';
-                        if (correctVal !== null && wrongVal !== null) {
-                            statsBadge = `
-                                <span class="text-[10px] text-gray-400 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded font-mono ml-2">
-                                    <span class="text-green-400 font-bold">${correctVal}D</span> / <span class="text-red-400 font-bold">${wrongVal}Y</span>
-                                </span>
-                            `;
-                        }
-        
-                        sessionsHtml += `
-                            <div class="p-2.5 bg-gray-950/80 rounded-lg border border-gray-800/80 space-y-1">
-                                <div class="flex justify-between items-center text-xs">
-                                    <div class="flex items-center gap-1.5 flex-1 pr-2">
-                                        <span class="font-bold text-white">${subj}</span>
-                                        ${topic ? `<span class="text-gray-400 text-[11px]">- ${topic}</span>` : ''}
-                                        ${statsBadge}
+                        // 4. Katman: Oturum (Konu ve Detayları)
+                        let logsHtml = '';
+                        subjData.logs.forEach(log => {
+                            const sessionStats = { tests: log.t, questions: log.q, correct: log.c, wrong: log.w, hasDY: log.hasDY };
+                            logsHtml += `
+                                <div class="p-2.5 bg-gray-900/60 rounded border border-gray-800/60 mb-1.5 last:mb-0">
+                                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                        <div class="flex-1">
+                                            <span class="font-bold text-gray-300 text-xs">- ${log.topic}</span>
+                                            ${log.note ? `<p class="text-[10px] text-gray-500 mt-1 italic"><i class="fa-solid fa-pen-nib mr-1"></i>${log.note}</p>` : ''}
+                                        </div>
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            ${generateStatsBadges(sessionStats, false)}
+                                        </div>
                                     </div>
-                                    <span class="text-green-400 font-bold text-xs bg-green-950/60 px-2 py-0.5 rounded border border-green-800/50 font-mono">${qCount} Soru</span>
                                 </div>
-                                ${note ? `<p class="text-[11px] text-gray-400 bg-gray-900/50 p-1.5 rounded border border-gray-800/50 italic"><i class="fa-regular fa-comment-dots mr-1"></i>${note}</p>` : ''}
+                            `;
+                        });
+        
+                        // 3. Katman: Ders (Subject)
+                        subjectsHtml += `
+                            <div class="border border-gray-800/60 rounded-lg bg-gray-950/60 overflow-hidden mb-2 last:mb-0">
+                                <button onclick="toggleReviewAccordion('${subjId}', '${subjId}-icon')" class="w-full p-2.5 flex justify-between items-center text-left hover:bg-gray-800/40 transition">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-book-open text-indigo-400 text-[10px]"></i>
+                                        <span class="font-bold text-gray-200 text-xs">${subjName}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex items-center gap-1.5">
+                                            ${generateStatsBadges(subjData.stats, false)}
+                                        </div>
+                                        <i id="${subjId}-icon" class="fa-solid fa-chevron-down text-gray-500 text-[10px] transition-transform duration-200"></i>
+                                    </div>
+                                </button>
+                                <div id="${subjId}" class="hidden p-2 border-t border-gray-800/60 space-y-1 bg-black/20">
+                                    ${logsHtml}
+                                </div>
                             </div>
                         `;
-                    });
+                    }
         
+                    // 2. Katman: Gün (Day)
                     daysHtml += `
-                        <div class="border border-gray-800/80 rounded-lg bg-gray-900/60 overflow-hidden mb-2">
+                        <div class="border border-gray-800/80 rounded-lg bg-gray-900/60 overflow-hidden mb-2 last:mb-0">
                             <button onclick="toggleReviewAccordion('${dayId}', '${dayId}-icon')" class="w-full p-2.5 flex justify-between items-center text-left hover:bg-gray-800/60 transition">
                                 <div class="flex items-center gap-2">
                                     <i class="fa-regular fa-calendar-check text-green-400 text-xs"></i>
-                                    <span class="font-bold text-gray-200 text-xs">${dayData.title}</span>
+                                    <span class="font-bold text-gray-200 text-xs sm:text-sm">${dayData.title}</span>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-semibold text-green-400 bg-green-950/40 px-2 py-0.5 rounded border border-green-800/40 font-mono">${dayTotalQuestions} Soru</span>
+                                    <div class="flex items-center gap-1.5 flex-wrap justify-end hidden sm:flex">
+                                        ${generateStatsBadges(dayData.stats, true)}
+                                    </div>
                                     <i id="${dayId}-icon" class="fa-solid fa-chevron-down text-gray-400 text-[10px] transition-transform duration-200"></i>
                                 </div>
                             </button>
-                            
-                            <div id="${dayId}" class="hidden p-2 border-t border-gray-800/60 space-y-2 bg-gray-950/40">
-                                ${sessionsHtml}
+                            <div class="sm:hidden px-2.5 pb-2.5 pt-0 flex gap-1.5 flex-wrap justify-start border-b border-gray-800/40">
+                                 ${generateStatsBadges(dayData.stats, false)}
+                            </div>
+                            <div id="${dayId}" class="hidden p-2 border-t border-gray-800/60 bg-gray-950/40">
+                                ${subjectsHtml}
                             </div>
                         </div>
                     `;
                 }
         
+                // 1. Katman: Hafta (Week)
                 html += `
                     <div class="border border-gray-800 rounded-xl bg-gray-800/40 overflow-hidden mb-3">
                         <button onclick="toggleReviewAccordion('${weekId}', '${weekId}-icon')" class="w-full p-3 flex justify-between items-center text-left hover:bg-gray-800/70 transition">
@@ -2366,13 +2370,16 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-bold text-green-400 bg-green-900/30 px-2.5 py-1 rounded-lg border border-green-800/50 font-mono">${weekTotalQuestions} Soru</span>
+                                <div class="flex items-center gap-1.5 flex-wrap justify-end hidden md:flex">
+                                    ${generateStatsBadges(weekData.stats, true)}
+                                </div>
                                 <i id="${weekId}-icon" class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform duration-200"></i>
                             </div>
                         </button>
-        
+                        <div class="md:hidden px-3 pb-3 pt-0 flex gap-1.5 flex-wrap border-b border-gray-800/50">
+                            ${generateStatsBadges(weekData.stats, false)}
+                        </div>
                         <div id="${weekId}" class="hidden p-3 border-t border-gray-800 bg-gray-950/60">
-                            <p class="text-[10px] text-gray-400 uppercase tracking-wider mb-2 font-bold">Günlük Çalışma Detayları</p>
                             ${daysHtml}
                         </div>
                     </div>
@@ -2382,7 +2389,7 @@
             container.innerHTML = html;
         }
         
-        // 9. Ana Fonksiyon
+        // 7. Ana Fonksiyon
         async function selectStudentForReview(studentUid, studentEmail, studentName) {
             const detailsContainer = document.getElementById('selected-student-details');
             if (!detailsContainer) return;
@@ -2405,7 +2412,6 @@
                 } else if (userData.books && Array.isArray(userData.books)) {
                     booksList = userData.books;
                 }
-        
                 reviewStudentBooksCache = booksList;
         
                 const subjectsSet = new Set();
@@ -2420,7 +2426,6 @@
                         Tümü (${booksList.length})
                     </button>
                 `;
-        
                 subjectsList.forEach(subj => {
                     const count = booksList.filter(b => getSafeText(b.subject || b.ders) === subj).length;
                     const btnId = `review-subj-btn-${subj.replace(/\s+/g, '-')}`;
@@ -2475,9 +2480,9 @@
                             <div id="review-tab-logs" class="review-tab-content hidden space-y-3">
                                 <div class="flex justify-between items-center mb-1">
                                     <h3 class="text-xs font-bold text-green-400 uppercase tracking-wider">📝 Günlük Çalışma Geçmişi</h3>
-                                    <span class="text-[10px] text-gray-500">Detaylar için haftalara tıklayın</span>
+                                    <span class="text-[10px] text-gray-500">Detaylar için sekmelere tıklayın</span>
                                 </div>
-                                <div id="review-logs-accordion-container" class="space-y-2"></div>
+                                <div id="review-logs-accordion-container" class="space-y-2 pb-6"></div>
                             </div>
                         </div>
                     </div>
